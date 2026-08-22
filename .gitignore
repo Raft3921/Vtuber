@@ -3,4 +3,5 @@ dist/
 .update-backup/
 .DS_Store
 Icon
+Icon?
 npm-debug.log*

@@ -29,8 +29,7 @@ const group = (id) => {
   return clients.get(id);
 };
 
-http
-  .createServer(async (req, res) => {
+export const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://127.0.0.1");
     const member = url.searchParams.get("member") || "7";
     if (url.pathname === "/settings") {
@@ -146,7 +145,15 @@ http
     } catch {
       res.writeHead(404).end("Not found");
     }
-  })
-  .listen(8777, "127.0.0.1", () =>
-    console.log("VTuberスタジオ: http://127.0.0.1:8777/"),
-  );
+  });
+
+export const serverReady = new Promise((resolve, reject) => {
+  server.once("error", reject);
+  server.listen(8777, "127.0.0.1", () => {
+    server.off("error", reject);
+    console.log("RAFT Vtuber: http://127.0.0.1:8777/");
+    resolve(server);
+  });
+});
+
+await serverReady;

@@ -29,6 +29,11 @@ const appIcon = nativeImage.createFromPath(
   fileURLToPath(new URL("./members/icon/icon.png", import.meta.url)),
 );
 
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
+
 function windowOptions(width = 1180, height = 820) {
   return {
     width,
@@ -64,13 +69,14 @@ function openTracker(pathname, title) {
 }
 
 function showMain() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.show();
   mainWindow.focus();
 }
 
 function makeTray() {
   tray = new Tray(appIcon.resize({ width: 22, height: 22 }));
-  tray.setToolTip("無残のラフト VTuberスタジオ");
+  tray.setToolTip("RAFT Vtuber");
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: "スタジオを開く", click: showMain },
@@ -123,9 +129,27 @@ async function checkForUpdates(showResult = true) {
   }
 }
 
+app.on("second-instance", showMain);
+
 await app.whenReady();
 process.env.VTUBER_CONFIG_ROOT = join(app.getPath("userData"), "config");
-await import("./server.mjs");
+try {
+  const response = await fetch(baseUrl);
+  const body = response.ok ? await response.text() : "";
+  if (!body.includes("VTuberスタジオ")) throw new Error("unexpected server");
+} catch {
+  try {
+    await import("./server.mjs");
+  } catch (error) {
+    await dialog.showMessageBox({
+      type: "error",
+      message: "RAFT Vtuberを起動できませんでした。",
+      detail: `ローカルサーバー（127.0.0.1:8777）を開始できません。\n${String(error?.message || error)}`,
+    });
+    app.quit();
+    process.exit(1);
+  }
+}
 session.defaultSession.setPermissionRequestHandler(
   (_webContents, permission, callback) => {
     callback(permission === "media");
@@ -138,7 +162,7 @@ powerSaveBlocker.start("prevent-app-suspension");
 
 mainWindow = new BrowserWindow({
   ...windowOptions(),
-  title: "無残のラフト VTuberスタジオ",
+  title: "RAFT Vtuber",
 });
 await mainWindow.loadURL(baseUrl);
 mainWindow.on("close", (event) => {

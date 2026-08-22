@@ -1,13 +1,13 @@
 {
   "name": "muzan-raft-vtuber-studio",
-  "version": "1.0.0",
+  "version": "1.0.7",
   "description": "Camera-tracked VTuber studio for OBS",
   "author": "Raft3921",
-  "main": "desktop.mjs",
+  "main": "bootstrap.cjs",
   "private": true,
   "type": "module",
   "scripts": {
-    "desktop": "electron desktop.mjs",
+    "desktop": "electron .",
     "check": "node scripts/audit-assets.mjs",
     "dist:mac": "electron-builder --mac dmg zip --arm64 --x64",
     "dist:win": "electron-builder --win nsis"
@@ -22,10 +22,11 @@
   },
   "build": {
     "appId": "jp.muzannoraft.vtuberstudio",
-    "productName": "無残のラフト VTuberスタジオ",
+    "productName": "RAFT Vtuber",
     "asar": true,
     "icon": "members/icon/icon.png",
     "files": [
+      "bootstrap.cjs",
       "desktop.mjs",
       "server.mjs",
       "index.html",
@@ -57,7 +58,7 @@
           ]
         }
       ],
-      "artifactName": "VTuber-Studio-${version}-mac-${arch}.${ext}"
+      "artifactName": "RAFT-Vtuber-${version}-mac-${arch}.${ext}"
     },
     "win": {
       "icon": "build/icon.ico",
@@ -69,7 +70,7 @@
           ]
         }
       ],
-      "artifactName": "VTuber-Studio-${version}-windows-${arch}.${ext}"
+      "artifactName": "RAFT-Vtuber-${version}-windows-${arch}.${ext}"
     },
     "dmg": {
       "icon": "build/icon.icns"
