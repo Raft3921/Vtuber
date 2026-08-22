@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>ラフト・ライブ</title>
-    <link rel="stylesheet" href="raft.css" />
+    <title>RAFT Vtuber</title>
+    <link rel="stylesheet" href="/shared/studio.css" />
   </head>
   <body>
     <main>
@@ -13,11 +13,11 @@
         ><span id="status">待機中</span>
       </section>
       <aside>
-        <h1>No.1 ラフト</h1>
+        <h1 id="memberName">アバター</h1>
         <p>顔・目・口・眉・髪をカメラで追跡</p>
         <button id="start">カメラを開始</button
         ><button id="demo">動きテスト</button><button id="full">全画面</button
-        ><button id="openAdjuster">部位の位置・大きさ調整</button
+        ><button id="openAdjuster">部位・動き調整</button
         ><button id="openMapper">表情アセット割り当て</button
         ><button id="exportAll" hidden>全設定JSONを書き出す</button>
         <div class="expressions">
@@ -34,14 +34,7 @@
           <dt>目</dt>
           <dd id="eyeValue">100%</dd>
         </dl>
-        <small
-          >OBS 透過（推奨）<br /><code
-            >http://127.0.0.1:8777/raft/?obs=1&amp;bg=transparent&amp;member=1</code
-          ><br /><br />OBS GB<br /><code
-            >http://127.0.0.1:8777/raft/?obs=1&amp;bg=green&amp;member=1</code
-          ><br /><br />OBS BB<br /><code
-            >http://127.0.0.1:8777/raft/?obs=1&amp;bg=blue&amp;member=1</code
-          ></small
+        <small id="obsLinks">OBSリンクを準備中…</small
         >
       </aside>
     </main>
@@ -49,7 +42,7 @@
       <form method="dialog" class="adjust-card">
         <header>
           <div>
-            <h2>部位調整</h2>
+            <h2>部位・動き調整</h2>
             <p>
               中央のアバターで調整したい部位を直接押すか、左の一覧から選択します。
             </p>
@@ -67,10 +60,7 @@
           <aside class="part-controls">
             <h3 id="selectedPartName">部位を選択</h3>
             <div id="partSliders"></div>
-            <button type="button" id="resetPart">この部位を初期値へ</button
-            ><button type="button" id="resetAllParts">
-              髪の調整をすべて初期値へ
-            </button>
+            <button type="button" id="resetPart">この部位を初期値へ</button>
           </aside>
         </div>
       </form>
@@ -120,6 +110,6 @@
       </form>
     </dialog>
     <video id="camera" playsinline muted></video>
-    <script type="module" src="raft.js"></script>
+    <script type="module" src="/shared/studio-loader.js"></script>
   </body>
 </html>

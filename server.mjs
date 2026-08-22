@@ -118,17 +118,17 @@ export const server = http.createServer(async (req, res) => {
       base = weekRoot;
       pathname = pathname.slice("/week".length);
       if (pathname === "/") pathname = "/index.html";
-    } else if (pathname.startsWith("/tanutsuna/")) {
-      base = join(root, "members", "tanutsuna");
-      pathname = pathname.slice("/tanutsuna".length);
-      if (pathname === "/") pathname = "/index.html";
-    } else if (pathname.startsWith("/raft/")) {
-      base = join(root, "members", "raft");
-      pathname = pathname.slice("/raft".length);
-      if (pathname === "/") pathname = "/index.html";
     } else if (pathname.startsWith("/shared/")) {
       base = join(root, "members", "shared");
       pathname = pathname.slice("/shared".length);
+    } else if (/^\/[a-z0-9_-]+\//i.test(pathname)) {
+      const [, slug, rest] = pathname.match(/^\/([a-z0-9_-]+)(\/.*)$/i);
+      base = join(root, "members", slug);
+      pathname = rest;
+      if (pathname === "/") {
+        base = join(root, "members", "shared");
+        pathname = "/studio.html";
+      }
     } else if (pathname === "/") pathname = "/index.html";
     const safe = normalize(decodeURIComponent(pathname)).replace(
       /^(\.\.(\/|\\|$))+/,

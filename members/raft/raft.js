@@ -1,3 +1,15 @@
+import {
+  blankProfiles,
+  catalog,
+  defaultLayout,
+  layoutControls,
+  stateLabels,
+} from "../shared/studio-config.js";
+import {
+  appendLayoutSection,
+  appendVisualSection,
+} from "../shared/settings-ui.js";
+
 const $ = (id) => document.getElementById(id),
   canvas = $("stage"),
   video = $("camera"),
@@ -429,59 +441,6 @@ const hoodTipRegions = [
     [679, 840, 245, 245],
   ],
   hoodTips = hoodTipRegions.map((r) => crop(art.base, ...r));
-const catalog = {
-  eye: [
-    { id: "blink-0", label: "超めちゃ開け" },
-    { id: "blink-1", label: "めちゃ開け" },
-    { id: "blink-2", label: "ちょいめちゃ開け" },
-    { id: "normal", label: "開け（瞳追従）" },
-    { id: "blink-4", label: "ちょい閉じ" },
-    { id: "blink-5", label: "閉じ" },
-  ],
-  brow: [
-    { id: "raised", label: "上げ眉" },
-    { id: "relaxed", label: "通常眉" },
-    { id: "frown", label: "寄せ眉・不機嫌" },
-  ],
-  mouth: Array.from({ length: 16 }, (_, i) => ({
-    id: `speech-${i}`,
-    label: `${["通常", "笑顔", "不機嫌", "丸口"][Math.floor(i / 4)]} ${["最小", "小", "中", "最大"][i % 4]}`,
-  })),
-};
-const stateLabels = {
-  eye: [
-    "超めちゃ開け",
-    "めちゃ開け",
-    "ちょいめちゃ開け",
-    "開け",
-    "ちょい閉じ",
-    "閉じ",
-  ],
-  brow: ["上げ眉", "通常眉", "寄せ眉・不機嫌"],
-  mouth: Array.from(
-    { length: 16 },
-    (_, i) =>
-      `${["通常", "笑顔", "不機嫌", "丸口"][Math.floor(i / 4)]}・${["最小", "小", "中", "最大"][i % 4]}`,
-  ),
-};
-const blankProfiles = () => ({
-    eye: Array(6).fill(null),
-    brow: Array(3).fill(null),
-    mouth: Array(16).fill(null),
-  }),
-  defaultLayout = {
-    eyeGap: 204,
-    eyeY: 614,
-    browGap: 204,
-    browY: 5,
-    browTilt: 17,
-    irisGap: 204,
-    irisY: 0,
-    irisSize: 34,
-    noseY: 0,
-    mouthY: 0,
-    mouthScale: 1.15,
-  };
 const defaultVisual = {
   outlineLayers: 0,
   outlineWidth: 5,
@@ -870,15 +829,17 @@ function drawBrows(kind, x, y) {
     baseTilt = Number(mapping.layout.browTilt) || 0,
     slope = baseTilt + (kind === "frown" ? 7 : kind === "raised" ? -7 : 0);
   ctx.save();
-  ctx.translate(x, dy);
+  ctx.translate(627 + x + mapping.layout.browX, 526 + dy);
+  ctx.rotate((mapping.layout.browRotation * Math.PI) / 180);
+  ctx.scale(mapping.layout.browScale, mapping.layout.browScale);
   ctx.strokeStyle = "#17100e";
   ctx.lineWidth = 5;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(445 - gap, 526);
-  ctx.lineTo(565 - gap, 526 + slope);
-  ctx.moveTo(689 + gap, 526 + slope);
-  ctx.lineTo(809 + gap, 526);
+  ctx.moveTo(445 - gap - 627, 0);
+  ctx.lineTo(565 - gap - 627, slope);
+  ctx.moveTo(689 + gap - 627, slope);
+  ctx.lineTo(809 + gap - 627, 0);
   ctx.stroke();
   ctx.restore();
 }
@@ -904,6 +865,11 @@ function drawBlinkAsset(assetId, x, y) {
     assetId === "normal"
       ? 3
       : Math.max(0, Math.min(5, Number(assetId.split("-")[1]) || 0));
+  ctx.save();
+  ctx.translate(627 + x + mapping.layout.eyeX, mapping.layout.eyeY + y);
+  ctx.rotate((mapping.layout.eyeRotation * Math.PI) / 180);
+  ctx.scale(mapping.layout.eyeScale, mapping.layout.eyeScale);
+  ctx.translate(-(627 + x), -(mapping.layout.eyeY + y));
   for (let side = 0; side < 2; side++)
     anchored(
       shapePairs[stage][side],
@@ -912,9 +878,15 @@ function drawBlinkAsset(assetId, x, y) {
       mapping.layout.eyeY + y,
       118,
     );
+  ctx.restore();
   if (stage >= 5) return;
   irisCtx.globalCompositeOperation = "source-over";
   irisCtx.clearRect(0, 0, 1254, 1254);
+  irisCtx.save();
+  irisCtx.translate(627 + x + mapping.layout.eyeX, mapping.layout.eyeY + y);
+  irisCtx.rotate((mapping.layout.eyeRotation * Math.PI) / 180);
+  irisCtx.scale(mapping.layout.eyeScale, mapping.layout.eyeScale);
+  irisCtx.translate(-(627 + x), -(mapping.layout.eyeY + y));
   for (let side = 0; side < 2; side++)
     anchoredOn(
       irisCtx,
@@ -938,6 +910,7 @@ function drawBlinkAsset(assetId, x, y) {
     );
   }
   irisCtx.globalCompositeOperation = "source-over";
+  irisCtx.restore();
   ctx.drawImage(irisLayer, 0, 0);
 }
 const featureKeys = {
@@ -1272,7 +1245,8 @@ function advanceMouthBaton(wanted) {
 function drawMouthFixed(info, x, y, sx = 1, sy = 1) {
   const scale = info.scale * mapping.layout.mouthScale;
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(x + mapping.layout.mouthX, y);
+  ctx.rotate((mapping.layout.mouthRotation * Math.PI) / 180);
   ctx.scale(scale * sx, scale * sy);
   ctx.drawImage(
     info.img,
@@ -1442,7 +1416,15 @@ function render(now) {
       );
   });
   outlinedLayer(() => {
-    ctx.drawImage(nosePart, 602 + x, 665 + y + mapping.layout.noseY);
+    ctx.save();
+    ctx.translate(
+      627 + x + mapping.layout.noseX,
+      695 + y + mapping.layout.noseY,
+    );
+    ctx.rotate((mapping.layout.noseRotation * Math.PI) / 180);
+    ctx.scale(mapping.layout.noseScale, mapping.layout.noseScale);
+    ctx.drawImage(nosePart, -25, -30);
+    ctx.restore();
     drawBlinkAsset(mapping.eye[blinkFrame], x, y);
     const browVisual = advanceBaton(browBaton, nearest("brow", browState()));
     drawBrows(mapping.brow[browVisual.index], x, y);
@@ -1511,76 +1493,7 @@ function previewFor(type, id) {
   }
   return c;
 }
-const layoutControls = [
-  ["eyeGap", "目と目の間隔", 150, 270, 1],
-  ["eyeY", "目の上下位置", 570, 660, 1],
-  ["browGap", "眉と眉の間隔", 150, 270, 1],
-  ["browY", "眉の上下位置", -40, 40, 1],
-  ["browTilt", "眉毛の傾き", -30, 40, 1],
-  ["irisGap", "瞳と瞳の間隔", 150, 270, 1],
-  ["irisY", "瞳の上下位置", -35, 35, 1],
-  ["irisSize", "瞳の大きさ", 20, 55, 1],
-  ["noseY", "鼻の上下位置", -40, 40, 1],
-  ["mouthY", "口の上下位置", -55, 55, 1],
-  ["mouthScale", "口全体の大きさ", 0.6, 1.8, 0.05],
-];
-const visualControls = [
-  ["outlineColor1", "第1アウトライン"],
-  ["outlineColor2", "第2アウトライン"],
-  ["outlineColor3", "第3アウトライン"],
-];
 let captureTarget = null;
-function buildVisualControls(host) {
-  const section = document.createElement("section");
-  section.className = "mapping-group";
-  section.innerHTML =
-    "<h3>見た目・アウトライン</h3><small>皮膚の陰影は顔・首などの肌色部分だけに微妙なグラデーションを加えます。背景や白目には適用されません。</small>";
-  const grid = document.createElement("div");
-  grid.className = "visual-grid";
-  for (const [key, label, min, max, step] of [
-    ["paintDepth", "皮膚の陰影", 0, 1, 0.01],
-    ["backHairBrightness", "後ろ髪の明度", 0.5, 1.2, 0.01],
-    ["outlineLayers", "アウトラインの層数", 0, 3, 1],
-    ["outlineWidth", "1層ごとの太さ", 1, 20, 1],
-  ]) {
-    const wrap = document.createElement("label");
-    wrap.className = "layout-control";
-    const name = document.createElement("span");
-    name.textContent = label;
-    const output = document.createElement("output");
-    output.textContent = String(mapping.visual[key]);
-    const input = document.createElement("input");
-    input.type = "range";
-    input.min = min;
-    input.max = max;
-    input.step = step;
-    input.value = mapping.visual[key];
-    input.oninput = () => {
-      mapping.visual[key] = Number(input.value);
-      output.textContent = input.value;
-      saveMapping();
-    };
-    wrap.append(name, output, input);
-    grid.append(wrap);
-  }
-  for (const [key, label] of visualControls) {
-    const wrap = document.createElement("label");
-    wrap.className = "color-control";
-    const name = document.createElement("span");
-    name.textContent = label;
-    const input = document.createElement("input");
-    input.type = "color";
-    input.value = mapping.visual[key];
-    input.oninput = () => {
-      mapping.visual[key] = input.value;
-      saveMapping();
-    };
-    wrap.append(name, input);
-    grid.append(wrap);
-  }
-  section.append(grid);
-  host.append(section);
-}
 async function beginCapture(type, index, label) {
   if (demo) {
     demo = false;
@@ -1603,6 +1516,8 @@ function closeCapture() {
 function buildMapper() {
   const host = $("mappingTables");
   host.replaceChildren();
+  appendVisualSection(host, mapping.visual, saveMapping);
+  appendLayoutSection(host, mapping.layout, layoutControls, saveMapping);
   for (const type of ["eye", "brow", "mouth"]) {
     const group = document.createElement("section");
     group.className = "mapping-group";
@@ -1658,7 +1573,9 @@ const partControlDefs = [
 const facePartDefs = {
   __eye: {
     label: "目（白目）",
-    controls: layoutControls.filter((v) => ["eyeGap", "eyeY"].includes(v[0])),
+    controls: layoutControls.filter((v) =>
+      ["eyeGap", "eyeX", "eyeY", "eyeScale", "eyeRotation"].includes(v[0]),
+    ),
   },
   __iris: {
     label: "瞳",
@@ -1669,17 +1586,24 @@ const facePartDefs = {
   __brow: {
     label: "眉",
     controls: layoutControls.filter((v) =>
-      ["browGap", "browY", "browTilt"].includes(v[0]),
+      [
+        "browGap",
+        "browX",
+        "browY",
+        "browTilt",
+        "browScale",
+        "browRotation",
+      ].includes(v[0]),
     ),
   },
   __nose: {
     label: "鼻",
-    controls: layoutControls.filter((v) => v[0] === "noseY"),
+    controls: layoutControls.filter((v) => v[0].startsWith("nose")),
   },
   __mouth: {
     label: "口",
     controls: layoutControls.filter((v) =>
-      ["mouthY", "mouthScale"].includes(v[0]),
+      ["mouthX", "mouthY", "mouthScale", "mouthRotation"].includes(v[0]),
     ),
   },
   __ears: {
@@ -1884,14 +1808,6 @@ $("resetPart").onclick = () => {
     mapping.visual = { ...defaultVisual };
     saveMapping();
   } else return;
-  highlightUntil = performance.now() + 1100;
-  buildAdjuster();
-};
-$("resetAllParts").onclick = () => {
-  hairAdjustments = Object.fromEntries(
-    hairPieceDefs.map((p) => [p.id, defaultHairAdjustment()]),
-  );
-  saveHairAdjustments();
   highlightUntil = performance.now() + 1100;
   buildAdjuster();
 };
