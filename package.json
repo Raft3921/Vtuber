@@ -38,6 +38,8 @@
     ],
     "mac": {
       "icon": "build/icon.icns",
+      "identity": "-",
+      "hardenedRuntime": false,
       "category": "public.app-category.video",
       "target": [
         {
