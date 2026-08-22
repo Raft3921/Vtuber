@@ -9,7 +9,7 @@
   "scripts": {
     "desktop": "electron desktop.mjs",
     "check": "node scripts/audit-assets.mjs",
-    "dist:mac": "electron-builder --mac dmg zip",
+    "dist:mac": "electron-builder --mac dmg zip --arm64 --x64",
     "dist:win": "electron-builder --win nsis"
   },
   "dependencies": {
