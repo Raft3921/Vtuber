@@ -913,7 +913,6 @@ function drawBrows(kind, x, y) {
   ctx.translate(627 + x + mapping.layout.browX, 526 + dy);
   ctx.rotate((mapping.layout.browRotation * Math.PI) / 180);
   ctx.scale(mapping.layout.browScale, mapping.layout.browScale);
-  ctx.translate(-627, -526);
   ctx.strokeStyle = "#17100e";
   ctx.lineWidth = 5;
   ctx.lineCap = "round";
