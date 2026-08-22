@@ -49,16 +49,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and publish installer
+      - name: Build installer
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run ${{ matrix.command }} -- --publish always
+        run: npm run ${{ matrix.command }} -- --publish never
+
+      - name: Store installer files
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.blockmap
+            dist/*.yml
 
   publish:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Download both operating system builds
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
       - name: Resolve release tag
         id: tag
         shell: bash
@@ -73,4 +90,9 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit '${{ steps.tag.outputs.tag }}' --draft=false --repo '${{ github.repository }}'
+        shell: bash
+        run: |
+          gh release create '${{ steps.tag.outputs.tag }}' release/* \
+            --repo '${{ github.repository }}' \
+            --title 'VTuber Studio ${{ steps.tag.outputs.tag }}' \
+            --generate-notes
