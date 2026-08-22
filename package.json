@@ -17,7 +17,8 @@
   },
   "devDependencies": {
     "electron": "43.4.1",
-    "electron-builder": "26.15.3"
+    "electron-builder": "26.15.3",
+    "png-to-ico": "^3.0.2"
   },
   "build": {
     "appId": "jp.muzannoraft.vtuberstudio",
@@ -36,6 +37,7 @@
       "package.json"
     ],
     "mac": {
+      "icon": "build/icon.icns",
       "category": "public.app-category.video",
       "target": [
         {
@@ -56,6 +58,7 @@
       "artifactName": "VTuber-Studio-${version}-mac-${arch}.${ext}"
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -65,6 +68,9 @@
         }
       ],
       "artifactName": "VTuber-Studio-${version}-windows-${arch}.${ext}"
+    },
+    "dmg": {
+      "icon": "build/icon.icns"
     },
     "nsis": {
       "oneClick": false,
