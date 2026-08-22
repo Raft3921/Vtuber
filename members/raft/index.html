@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ラフト・ライブ</title>
+    <link rel="stylesheet" href="raft.css" />
+  </head>
+  <body>
+    <main>
+      <section>
+        <canvas id="stage" width="1254" height="1254"></canvas
+        ><span id="status">待機中</span>
+      </section>
+      <aside>
+        <h1>No.1 ラフト</h1>
+        <p>顔・目・口・眉・髪をカメラで追跡</p>
+        <button id="start">カメラを開始</button
+        ><button id="demo">動きテスト</button><button id="full">全画面</button
+        ><button id="openAdjuster">部位の位置・大きさ調整</button
+        ><button id="openMapper">表情アセット割り当て</button
+        ><button id="exportAll" hidden>全設定JSONを書き出す</button>
+        <div class="expressions">
+          <strong>自動表情</strong
+          ><small
+            >目・眉・口はカメラで取得した形に最も近い差分へ順番に切り替わります。割り当てはこの端末へ自動保存されます。</small
+          >
+        </div>
+        <dl>
+          <dt>口</dt>
+          <dd id="mouthValue">0%</dd>
+          <dt>視線</dt>
+          <dd id="gazeValue">0.00</dd>
+          <dt>目</dt>
+          <dd id="eyeValue">100%</dd>
+        </dl>
+        <small
+          >OBS 透過（推奨）<br /><code
+            >http://127.0.0.1:8777/raft/?obs=1&amp;bg=transparent&amp;member=1</code
+          ><br /><br />OBS GB<br /><code
+            >http://127.0.0.1:8777/raft/?obs=1&amp;bg=green&amp;member=1</code
+          ><br /><br />OBS BB<br /><code
+            >http://127.0.0.1:8777/raft/?obs=1&amp;bg=blue&amp;member=1</code
+          ></small
+        >
+      </aside>
+    </main>
+    <dialog id="adjuster">
+      <form method="dialog" class="adjust-card">
+        <header>
+          <div>
+            <h2>部位調整</h2>
+            <p>
+              中央のアバターで調整したい部位を直接押すか、左の一覧から選択します。
+            </p>
+          </div>
+          <button value="cancel" class="close">閉じる</button>
+        </header>
+        <div class="adjust-workspace">
+          <nav id="partList" class="part-list" aria-label="調整部位"></nav>
+          <section class="adjust-preview">
+            <canvas id="adjustStage" width="1254" height="1254"></canvas>
+            <div class="adjust-hint">
+              目・瞳・眉・鼻・口・髪をクリックすると約1秒間強調されます
+            </div>
+          </section>
+          <aside class="part-controls">
+            <h3 id="selectedPartName">部位を選択</h3>
+            <div id="partSliders"></div>
+            <button type="button" id="resetPart">この部位を初期値へ</button
+            ><button type="button" id="resetAllParts">
+              髪の調整をすべて初期値へ
+            </button>
+          </aside>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="mapper">
+      <form method="dialog" class="mapper-card">
+        <header>
+          <div>
+            <h2>表情アセット割り当て</h2>
+            <p>
+              画像ごとに実際の顔を登録します。配信中は登録した顔に最も近い画像へ切り替わります。
+            </p>
+          </div>
+          <button value="cancel" class="close">閉じる</button>
+        </header>
+        <div id="capturePanel" hidden>
+          <video
+            id="capturePreview"
+            class="capture-preview"
+            playsinline
+            muted
+          ></video>
+          <div>
+            <strong id="captureTitle">表情を作ってください</strong>
+            <p>
+              カメラに向かって使いたい表情を作り、そのまま決定してください。
+            </p>
+            <button type="button" id="commitFace">この表情に決定</button
+            ><button type="button" id="cancelCapture">キャンセル</button>
+          </div>
+        </div>
+        <div id="mappingTables"></div>
+        <footer>
+          <label class="import"
+            >JSONを読み込む<input
+              id="importJson"
+              type="file"
+              accept="application/json" /></label
+          ><button type="button" id="resetMapping">初期設定へ戻す</button
+          ><button type="button" id="exportJson" hidden>
+            全設定JSONを書き出す</button
+          ><small
+            >JSON書き出しボタンは F8
+            を押した時だけ表示／非表示になります。</small
+          >
+        </footer>
+      </form>
+    </dialog>
+    <video id="camera" playsinline muted></video>
+    <script type="module" src="raft.js"></script>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+{
+  "shared": [
+    "members/shared/cleaned/eye-whites-v2.png",
+    "members/shared/cleaned/irises-v2.png",
+    "members/shared/cleaned/eyebrows.png",
+    "members/shared/cleaned/mouth.png",
+    "members/shared/cleaned/rig-atlas.png",
+    "members/shared/cleaned/eye-expressions.png",
+    "members/shared/cleaned/mouth-speech-16-v3.png",
+    "members/shared/cleaned/eye-shapes-6-v2.png"
+  ],
+  "raft": [
+    "members/raft/parts/cleaned/base.png",
+    "members/raft/parts/cleaned/hair.png",
+    "members/raft/parts/cleaned/hair-upper.png",
+    "members/raft/parts/cleaned/hair-back.png",
+    "members/raft/parts/cleaned/hair-front-v4.png",
+    "members/raft/parts/cleaned/hair-upper-v4.png",
+    "members/raft/parts/cleaned/hair-back-v4.png",
+    "members/raft/parts/cleaned/hair-back-v5.png",
+    "members/raft/parts/cleaned/hair-seam-cap-v6.png",
+    "members/raft/parts/cleaned/hair-back-1-v13.png",
+    "members/raft/parts/cleaned/hair-back-2-v13.png",
+    "members/raft/parts/cleaned/hair-back-3-v13.png",
+    "members/raft/parts/cleaned/hair-upper-1-v13.png",
+    "members/raft/parts/cleaned/hair-upper-2-v13.png",
+    "members/raft/parts/cleaned/hair-upper-3-v13.png",
+    "members/raft/parts/cleaned/hair-front-1-v13.png",
+    "members/raft/parts/cleaned/hair-front-2-v13.png",
+    "members/raft/parts/cleaned/hair-front-3-v13.png"
+  ],
+  "tanutsuna": [
+    "members/tanutsuna/parts/cleaned/base.png",
+    "members/tanutsuna/parts/cleaned/hair.png",
+    "members/tanutsuna/parts/rig-v3/hair-back-full-v3-dark-alpha.png",
+    "members/tanutsuna/parts/rig-v3/hair-front-assembled-v3-alpha.png"
+  ],
+  "studio": ["members/icon/icon.png"],
+  "week": [
+    "members/week/!mouth.png",
+    "members/week/body.png",
+    "members/week/eye.png",
+    "members/week/head.png",
+    "members/week/left.png",
+    "members/week/left_eye.png",
+    "members/week/mouth.png",
+    "members/week/right.png",
+    "members/week/right_eye.png",
+    "members/week/white_eye.png"
+  ]
+}

@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.update-backup/
+.DS_Store
+Icon
+npm-debug.log*

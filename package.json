@@ -1,0 +1,83 @@
+{
+  "name": "muzan-raft-vtuber-studio",
+  "version": "1.0.0",
+  "description": "Camera-tracked VTuber studio for OBS",
+  "author": "Raft3921",
+  "main": "desktop.mjs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "desktop": "electron desktop.mjs",
+    "check": "node scripts/audit-assets.mjs",
+    "dist:mac": "electron-builder --mac dmg zip",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  },
+  "devDependencies": {
+    "electron": "43.4.1",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "jp.muzannoraft.vtuberstudio",
+    "productName": "無残のラフト VTuberスタジオ",
+    "asar": true,
+    "icon": "members/icon/icon.png",
+    "files": [
+      "desktop.mjs",
+      "server.mjs",
+      "index.html",
+      "studio.css",
+      "members/**/*",
+      "config/**/*",
+      "assets-manifest.json",
+      "version.json",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.video",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "VTuber-Studio-${version}-mac-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "VTuber-Studio-${version}-windows-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Raft3921",
+        "repo": "Vtuber"
+      }
+    ]
+  }
+}
