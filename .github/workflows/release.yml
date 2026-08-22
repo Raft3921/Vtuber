@@ -54,3 +54,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run ${{ matrix.command }} -- --publish always
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="v${{ inputs.version }}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit '${{ steps.tag.outputs.tag }}' --draft=false --repo '${{ github.repository }}'
