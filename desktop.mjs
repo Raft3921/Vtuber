@@ -33,6 +33,15 @@ let mainWindow,
   powerSaveBlockerId = null,
   quitting = false;
 const trackers = new Map();
+const trackerTitles = {
+  "/raft/": "ラフト追従",
+  "/mai/": "まい追従",
+  "/tanutsuna/": "たぬつな追従",
+  "/yansan/": "やんさん追従",
+  "/muto/": "ムート追従",
+  "/moron/": "もろん追従",
+  "/week/": "ウィーク追従",
+};
 const appIcon = nativeImage.createFromPath(
   fileURLToPath(new URL("./members/icon/icon.png", import.meta.url)),
 );
@@ -71,6 +80,24 @@ function updatePowerSaveBlocker() {
   }
 }
 
+function releaseUnusedVideoCaptureProcess() {
+  if (trackers.size > 0 || quitting) return;
+  setTimeout(() => {
+    if (trackers.size > 0 || quitting) return;
+    for (const metric of app.getAppMetrics()) {
+      const description = JSON.stringify(metric).toLowerCase();
+      if (
+        metric.type === "Utility" &&
+        (description.includes("video_capture") || description.includes("video capture"))
+      ) {
+        try {
+          process.kill(metric.pid, "SIGTERM");
+        } catch {}
+      }
+    }
+  }, 1200);
+}
+
 function openTracker(pathname, title) {
   let win = trackers.get(pathname);
   if (win && !win.isDestroyed()) {
@@ -85,14 +112,77 @@ function openTracker(pathname, title) {
   win.on("closed", () => {
     if (trackers.get(pathname) === win) trackers.delete(pathname);
     updatePowerSaveBlocker();
+    releaseUnusedVideoCaptureProcess();
   });
   return win;
 }
 
-function showMain() {
+async function showMain() {
+  if (!mainWindow || mainWindow.isDestroyed()) await createMainWindow();
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.show();
   mainWindow.focus();
+}
+
+async function createMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
+  const win = new BrowserWindow({
+    ...windowOptions(),
+    title: "RAFT Vtuber",
+  });
+  mainWindow = win;
+  win.on("closed", () => {
+    if (mainWindow === win) mainWindow = null;
+  });
+  win.on("close", async (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    if (serverCloseQuestionOpen) return;
+    const activeTrackers = [...trackers.values()].filter(
+      (tracker) => tracker && !tracker.isDestroyed(),
+    );
+    if (activeTrackers.length === 0) {
+      win.destroy();
+      releaseUnusedVideoCaptureProcess();
+      return;
+    }
+    serverCloseQuestionOpen = true;
+    const result = await dialog.showMessageBox(win, {
+      type: "question",
+      buttons: ["はい", "いいえ"],
+      defaultId: 1,
+      cancelId: 1,
+      message: "サーバーを閉じますか？",
+      detail:
+        "「はい」を選ぶと、起動中のメンバーカメラとサーバーを終了します。\n「いいえ」を選ぶと、サーバーを残してこのウインドウだけ閉じます。",
+      noLink: true,
+    });
+    serverCloseQuestionOpen = false;
+    if (result.response === 0) {
+      quitting = true;
+      app.quit();
+      return;
+    }
+    win.destroy();
+  });
+  win.webContents.on("will-navigate", (event, url) => {
+    const target = new URL(url);
+    if (target.origin !== baseUrl || !trackerTitles[target.pathname]) return;
+    event.preventDefault();
+    if (target.searchParams.get("obs") === "1") {
+      clipboard.writeText(url);
+      dialog.showMessageBox(win, {
+        type: "info",
+        message: "OBS用URLをコピーしました。",
+        detail:
+          "OBSのブラウザソースへ貼り付けてください。ランチャーでは重いアバター描画を開きません。",
+      });
+      return;
+    }
+    openTracker(target.pathname, trackerTitles[target.pathname]);
+  });
+  await win.loadURL(baseUrl);
+  return win;
 }
 
 function updateProgressHtml(message, detail = "", percent = null, stage = -1, steps = []) {
@@ -385,65 +475,7 @@ session.defaultSession.setPermissionRequestHandler(
 session.defaultSession.setPermissionCheckHandler(
   (_webContents, permission) => permission === "media",
 );
-mainWindow = new BrowserWindow({
-  ...windowOptions(),
-  title: "RAFT Vtuber",
-});
-await mainWindow.loadURL(baseUrl);
-mainWindow.on("close", async (event) => {
-  if (quitting) return;
-  event.preventDefault();
-  if (serverCloseQuestionOpen) return;
-  const activeTrackers = [...trackers.values()].filter(
-    (win) => win && !win.isDestroyed(),
-  );
-  if (activeTrackers.length === 0) {
-    mainWindow.hide();
-    return;
-  }
-  serverCloseQuestionOpen = true;
-  const result = await dialog.showMessageBox(mainWindow, {
-    type: "question",
-    buttons: ["はい", "いいえ"],
-    defaultId: 1,
-    cancelId: 1,
-    message: "サーバーを閉じますか？",
-    detail:
-      "「はい」を選ぶと、起動中のメンバーカメラとサーバーを終了します。\n「いいえ」を選ぶと、サーバーを残してこのウインドウだけ閉じます。",
-    noLink: true,
-  });
-  serverCloseQuestionOpen = false;
-  if (result.response === 0) {
-    quitting = true;
-    app.quit();
-    return;
-  }
-  mainWindow.hide();
-});
-mainWindow.webContents.on("will-navigate", (event, url) => {
-  const target = new URL(url);
-  if (
-    target.origin !== baseUrl ||
-    !["/raft/", "/mai/", "/tanutsuna/", "/yansan/", "/muto/", "/moron/", "/week/"].includes(target.pathname)
-  )
-    return;
-  event.preventDefault();
-  if (target.searchParams.get("obs") === "1") {
-    clipboard.writeText(url);
-    dialog.showMessageBox(mainWindow, {
-      type: "info",
-      message: "OBS用URLをコピーしました。",
-      detail: "OBSのブラウザソースへ貼り付けてください。ランチャーでは重いアバター描画を開きません。",
-    });
-    return;
-  }
-  const trackerTitles = {
-    "/raft/": "ラフト追従", "/mai/": "まい追従",
-    "/tanutsuna/": "たぬつな追従", "/yansan/": "やんさん追従",
-    "/muto/": "ムート追従", "/moron/": "もろん追従", "/week/": "ウィーク追従",
-  };
-  openTracker(target.pathname, trackerTitles[target.pathname]);
-});
+await createMainWindow();
 makeTray();
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
