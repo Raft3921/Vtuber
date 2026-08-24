@@ -160,16 +160,27 @@
     },
     "layout": {
       "eyeGap": 204,
+      "eyeX": 0,
       "eyeY": 614,
+      "eyeScale": 1,
+      "eyeRotation": 0,
       "browGap": 150,
-      "browY": 5,
+      "browX": 0,
+      "browY": -22,
+      "browScale": 1,
+      "browRotation": 0,
       "browTilt": 40,
       "irisGap": 172,
       "irisY": 0,
       "irisSize": 46,
+      "noseX": 0,
       "noseY": 0,
+      "noseScale": 1,
+      "noseRotation": 0,
+      "mouthX": 0,
       "mouthY": 0,
-      "mouthScale": 1.15
+      "mouthScale": 1.15,
+      "mouthRotation": 0
     },
     "visual": {
       "outlineLayers": 2,
@@ -192,6 +203,96 @@
       "hairPart5": 3,
       "hairPart6": 2.25,
       "hairPart7": 1.75
+    }
+  },
+  "hairAdjustments": {
+    "ahoge": {
+      "x": 0,
+      "y": 0,
+      "scale": 1,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 0,
+      "sway": 1
+    },
+    "hair-1": {
+      "x": 0,
+      "y": 0,
+      "scale": 1,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 0,
+      "sway": 1
+    },
+    "hair-2": {
+      "x": 0,
+      "y": 0,
+      "scale": 1,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 0,
+      "sway": 1
+    },
+    "hair-3": {
+      "x": 0,
+      "y": 0,
+      "scale": 1,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 0,
+      "sway": 1
+    },
+    "hair-4": {
+      "x": 0,
+      "y": 0,
+      "scale": 1,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 0,
+      "sway": 1
+    },
+    "hair-5": {
+      "x": 0,
+      "y": 0,
+      "scale": 1,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 0,
+      "sway": 1
+    },
+    "hair-6": {
+      "x": 0,
+      "y": 0,
+      "scale": 1,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 0,
+      "sway": 1
+    },
+    "hair-7": {
+      "x": 0,
+      "y": 0,
+      "scale": 1,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 0,
+      "sway": 1
     }
   }
 }

@@ -24,6 +24,7 @@ let mainWindow,
   updateProgressWindow,
   updateCheckInProgress = false,
   updateDownloadActive = false,
+  updateOperationStartedAt = 0,
   serverCloseQuestionOpen = false,
   manualUpdateCheck = false,
   macUpdateOnQuit = null,
@@ -93,7 +94,7 @@ function showMain() {
   mainWindow.focus();
 }
 
-function updateProgressHtml(message, detail = "", percent = null) {
+function updateProgressHtml(message, detail = "", percent = null, stage = -1, steps = []) {
   const safe = (text) => String(text).replace(
     /[&<>"']/g,
     (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char],
@@ -101,17 +102,22 @@ function updateProgressHtml(message, detail = "", percent = null) {
   const progress = Number.isFinite(percent)
     ? `<div class="bar"><i style="width:${Math.max(0, Math.min(100, percent))}%"></i></div>`
     : "";
+  const checklist = steps.length
+    ? `<ol>${steps.map((step, index) => `<li class="${index < stage ? "done" : index === stage ? "current" : ""}"><b>${index < stage ? "✓" : index === stage ? "●" : "○"}</b>${safe(step)}</li>`).join("")}</ol>`
+    : "";
+  const startedAt = updateOperationStartedAt || Date.now();
   return `<!doctype html><meta charset="utf-8"><style>
     :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#101d23;color:#f5fafb;font:14px -apple-system,BlinkMacSystemFont,sans-serif;display:grid;place-items:center;height:100vh}
-    main{width:100%;padding:24px;display:grid;grid-template-columns:32px 1fr;gap:14px;align-items:center}.spinner{width:28px;height:28px;border:3px solid #37515b;border-top-color:#f5f7f8;border-radius:50%;animation:spin .8s linear infinite}h1{font-size:15px;margin:0 0 7px}p{color:#a9bbc1;margin:0;font-size:12px;line-height:1.5}.bar{height:5px;background:#263b44;border-radius:5px;overflow:hidden;margin-top:12px}.bar i{display:block;height:100%;background:#f0ad38;border-radius:5px;transition:width .2s}@keyframes spin{to{transform:rotate(360deg)}}</style>
-    <main><div class="spinner"></div><div><h1>${safe(message)}</h1><p>${safe(detail)}</p>${progress}</div></main>`;
+    main{width:100%;padding:22px 24px}.head{display:grid;grid-template-columns:32px 1fr;gap:14px;align-items:center}.spinner{width:28px;height:28px;border:3px solid #37515b;border-top-color:#f5f7f8;border-radius:50%;animation:spin .8s linear infinite}h1{font-size:15px;margin:0 0 7px}p{color:#a9bbc1;margin:0;font-size:12px;line-height:1.5}.elapsed{color:#f0ad38;font-variant-numeric:tabular-nums}.bar{height:5px;background:#263b44;border-radius:5px;overflow:hidden;margin-top:12px}.bar i{display:block;height:100%;background:#f0ad38;border-radius:5px;transition:width .2s}ol{list-style:none;padding:12px 0 0 46px;margin:0;display:grid;gap:6px;color:#71878f;font-size:12px}li b{display:inline-block;width:20px}.done{color:#74c99a}.current{color:#f5fafb;font-weight:600}@keyframes spin{to{transform:rotate(360deg)}}</style>
+    <main><div class="head"><div class="spinner"></div><div><h1>${safe(message)}</h1><p>${safe(detail)}　<span class="elapsed" id="elapsed">0秒経過</span></p>${progress}</div></div>${checklist}</main>
+    <script>const startedAt=${startedAt};const tick=()=>{const seconds=Math.max(0,Math.floor((Date.now()-startedAt)/1000));document.getElementById("elapsed").textContent=seconds+"秒経過"};tick();setInterval(tick,250)</script>`;
 }
 
-function showUpdateProgress(message, detail = "", percent = null) {
+function showUpdateProgress(message, detail = "", percent = null, stage = -1, steps = []) {
   if (!updateProgressWindow || updateProgressWindow.isDestroyed()) {
     updateProgressWindow = new BrowserWindow({
       width: 410,
-      height: 170,
+      height: steps.length ? 270 : 190,
       title: "アップデート",
       alwaysOnTop: true,
       skipTaskbar: true,
@@ -128,7 +134,7 @@ function showUpdateProgress(message, detail = "", percent = null) {
     });
   }
   updateProgressWindow.loadURL(
-    `data:text/html;charset=utf-8,${encodeURIComponent(updateProgressHtml(message, detail, percent))}`,
+    `data:text/html;charset=utf-8,${encodeURIComponent(updateProgressHtml(message, detail, percent, stage, steps))}`,
   );
   updateProgressWindow.show();
   updateProgressWindow.focus();

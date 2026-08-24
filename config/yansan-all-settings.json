@@ -160,16 +160,27 @@
     },
     "layout": {
       "eyeGap": 204,
+      "eyeX": 0,
       "eyeY": 614,
+      "eyeScale": 1,
+      "eyeRotation": 0,
       "browGap": 150,
+      "browX": 0,
       "browY": 5,
-      "browTilt": 40,
+      "browScale": 1,
+      "browRotation": 0,
+      "browTilt": 1,
       "irisGap": 172,
       "irisY": 0,
       "irisSize": 46,
+      "noseX": 0,
       "noseY": 0,
+      "noseScale": 1,
+      "noseRotation": 0,
+      "mouthX": 0,
       "mouthY": 0,
-      "mouthScale": 1.15
+      "mouthScale": 1.15,
+      "mouthRotation": 0
     },
     "visual": {
       "outlineLayers": 2,
@@ -195,67 +206,37 @@
     }
   },
   "hairAdjustments": {
-    "back-left": {
+    "back-generated": {
+      "x": 1,
+      "y": -7,
+      "scale": 0.74,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 0,
+      "sway": 2.35
+    },
+    "upper-generated": {
+      "x": 17,
+      "y": -37,
+      "scale": 0.71,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 0,
+      "sway": 0
+    },
+    "front-generated": {
       "x": 0,
       "y": 0,
-      "scale": 1,
+      "scale": 0.75,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
       "rotation": 0,
-      "sway": 2.4
-    },
-    "back-center": {
-      "x": -29,
-      "y": 36,
-      "scale": 0.94,
-      "rotation": 0,
-      "sway": 2.4
-    },
-    "back-right": {
-      "x": -54,
-      "y": -54,
-      "scale": 0.9,
-      "rotation": 0,
-      "sway": 3
-    },
-    "upper-left": {
-      "x": 29,
-      "y": 51,
-      "scale": 1.18,
-      "rotation": -13,
-      "sway": 3
-    },
-    "upper-center": {
-      "x": -22,
-      "y": 70,
-      "scale": 1.65,
-      "rotation": 0,
-      "sway": 3
-    },
-    "upper-right": {
-      "x": -97,
-      "y": 45,
-      "scale": 1.09,
-      "rotation": 29.5,
-      "sway": 2.25
-    },
-    "front-left": {
-      "x": 0,
-      "y": 27,
-      "scale": 1,
-      "rotation": 0,
-      "sway": 3
-    },
-    "front-center": {
-      "x": -53,
-      "y": -4,
-      "scale": 1.07,
-      "rotation": 0,
-      "sway": 3
-    },
-    "front-right": {
-      "x": -93,
-      "y": 24,
-      "scale": 0.93,
-      "rotation": 8,
       "sway": 3
     }
   }

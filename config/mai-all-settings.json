@@ -169,7 +169,7 @@
       "browY": 5,
       "browScale": 1,
       "browRotation": 0,
-      "browTilt": 40,
+      "browTilt": 26,
       "irisGap": 172,
       "irisY": 0,
       "irisSize": 46,
@@ -210,6 +210,10 @@
       "x": 0,
       "y": 0,
       "scale": 0.62,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
       "rotation": 0,
       "sway": 1
     },
@@ -217,6 +221,10 @@
       "x": 0,
       "y": -76,
       "scale": 0.71,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
       "rotation": 0.5,
       "sway": 2.3
     },
@@ -224,6 +232,10 @@
       "x": 0,
       "y": 0,
       "scale": 0.68,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
       "rotation": 0,
       "sway": 3
     }
