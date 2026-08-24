@@ -1,10 +1,108 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>無残のラフト VTuberスタジオ</title><link rel="stylesheet" href="studio.css"></head><body class="launcher">
-<header><div><small>無残のラフト</small><h1>VTuberスタジオ</h1><p>1回の起動で、メンバーのカメラ画面とOBS表示をまとめて配信します。</p></div><span class="server"><i></i>サーバー起動中</span></header>
-<main><section class="members" id="members"></section><aside><h2>使い方</h2><ol><li>出演者の「カメラ」を開く</li><li>カメラを開始して追跡する</li><li>OBSへGBかBBのURLを追加</li></ol><p>OBSではソースの種類を「ブラウザ」にします。幅・高さは1000×1000がおすすめです。</p></aside></main>
-<small class="app-version" id="appVersion">バージョン確認中</small>
-<script>
-const data=[['1','ラフト',1,'raft'],['2','まい',1,'mai'],['3','たぬつな',1,'tanutsuna'],['4','やんさん',1,'yansan'],['5','ムート',1,'muto'],['6','もろん',1,'moron'],['7','ウィーク',1,'week']];
-const root=document.querySelector('#members');
-for(const [no,name,ready,slug] of data){const path=`/${slug}/`;const card=document.createElement('article');card.className=ready?'ready':'pending';card.innerHTML=`<b>No.${no}</b><h2>${name}</h2><span>${ready?'使用可能':'素材準備中'}</span><div>${ready?`<a href="${path}">カメラ</a><a href="${path}?obs=1&bg=transparent&member=${no}">OBS・透過</a><a href="${path}?obs=1&bg=green&member=${no}">OBS・GB</a><a href="${path}?obs=1&bg=blue&member=${no}">OBS・BB</a>`:'<button disabled>準備中</button>'}</div>`;root.append(card);}
-fetch('/version.json',{cache:'no-store'}).then(response=>response.json()).then(info=>{document.querySelector('#appVersion').textContent=`v${info.version}`}).catch(()=>{document.querySelector('#appVersion').textContent='バージョン不明'});
-</script></body></html>
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>無残のラフト VTuberスタジオ</title>
+    <link rel="stylesheet" href="studio.css">
+  </head>
+  <body class="launcher">
+    <div class="app-shell">
+      <nav class="rail" aria-label="スタジオメニュー">
+        <div class="brand-mark" aria-label="RAFT Vtuber">V</div>
+        <a class="rail-button active" href="/" aria-label="ホーム"><span class="home-icon"></span></a>
+        <div class="rail-line"></div>
+        <div class="member-shortcuts" id="memberShortcuts"></div>
+        <div class="rail-spacer"></div>
+        <span class="rail-status" title="ローカルサーバー起動中"></span>
+      </nav>
+
+      <div class="workspace">
+        <header>
+          <div class="page-title">
+            <span>STUDIO</span>
+            <h1>VTuberスタジオ</h1>
+          </div>
+          <div class="header-actions">
+            <span class="server"><i></i><span>サーバー起動中</span></span>
+            <small id="appVersion">バージョン確認中</small>
+          </div>
+        </header>
+
+        <main>
+          <section class="library" aria-labelledby="memberHeading">
+            <div class="toolbar">
+              <div>
+                <h2 id="memberHeading">メンバー</h2>
+                <p>配信に使うメンバーを選択してください</p>
+              </div>
+              <span class="count" id="memberCount"></span>
+            </div>
+            <div class="members" id="members"></div>
+          </section>
+
+          <aside>
+            <section class="guide">
+              <span class="eyebrow">QUICK START</span>
+              <h2>配信を始める</h2>
+              <ol>
+                <li><b>1</b><div><strong>カメラを開く</strong><span>出演するメンバーを選択</span></div></li>
+                <li><b>2</b><div><strong>追跡を開始</strong><span>カメラへのアクセスを許可</span></div></li>
+                <li><b>3</b><div><strong>OBSへ追加</strong><span>用途に合うURLを使用</span></div></li>
+              </ol>
+            </section>
+            <section class="obs-note">
+              <span class="obs-icon">OBS</span>
+              <div><strong>ブラウザソース</strong><p>推奨サイズ 1000 × 1000</p></div>
+            </section>
+          </aside>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      const data = [
+        ["1", "ラフト", "raft"],
+        ["2", "まい", "mai"],
+        ["3", "たぬつな", "tanutsuna"],
+        ["4", "やんさん", "yansan"],
+        ["5", "ムート", "muto"],
+        ["6", "もろん", "moron"],
+        ["7", "ウィーク", "week"],
+      ];
+      const root = document.querySelector("#members");
+      const shortcuts = document.querySelector("#memberShortcuts");
+      document.querySelector("#memberCount").textContent = `${data.length}人`;
+      for (const [no, name, slug] of data) {
+        const path = `/${slug}/`;
+        const card = document.createElement("article");
+        card.innerHTML = `
+          <div class="member-avatar" aria-hidden="true"></div>
+          <div class="member-meta"><small>MEMBER ${no.padStart(2, "0")}</small><h3>${name}</h3></div>
+          <a class="camera" href="${path}" aria-label="${name}のカメラを開く"><i></i>カメラ</a>
+          <div class="obs-links" aria-label="${name}のOBSリンク">
+            <span>OBS</span>
+            <a href="${path}?obs=1&bg=transparent&member=${no}">透過</a>
+            <a href="${path}?obs=1&bg=green&member=${no}">GB</a>
+            <a href="${path}?obs=1&bg=blue&member=${no}">BB</a>
+          </div>`;
+        root.append(card);
+
+        const shortcut = document.createElement("a");
+        shortcut.href = path;
+        shortcut.className = "member-shortcut";
+        shortcut.setAttribute("aria-label", `${name}のカメラを開く`);
+        shortcut.title = `${name}のカメラを開く`;
+        shortcuts.append(shortcut);
+      }
+      fetch("/version.json", { cache: "no-store" })
+        .then((response) => response.json())
+        .then((info) => {
+          document.querySelector("#appVersion").textContent = `v${info.version}`;
+        })
+        .catch(() => {
+          document.querySelector("#appVersion").textContent = "version -";
+        });
+    </script>
+  </body>
+</html>
