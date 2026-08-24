@@ -32,7 +32,10 @@ const query = new URLSearchParams(location.search),
   member = "3",
   STORE_KEY = "vtuber-expression-map-shared-v1";
 const HAIR_ADJUST_KEY = "vtuber-tanutsuna-hair-adjust-v1",
-  defaultHairAdjustment = { x: 0, y: 0, scale: 1, rotation: 0, sway: 1 };
+  defaultHairAdjustment = {
+    x: 0, y: 0, scale: 1, lockAspect: true, scaleX: 1, scaleY: 1,
+    layer: 0, rotation: 0, sway: 1,
+  };
 document.body.classList.toggle("obs", obs);
 document.body.classList.toggle(
   query.get("bg") === "blue" ? "blue" : "green",
@@ -321,13 +324,19 @@ const hairPartId = (index) => (index === 0 ? "ahoge" : `hair-${index}`),
       hairPartId(index),
       { ...defaultHairAdjustment },
     ]),
-  );
+  ),
+  normalizeHairAdjustments = (raw = {}) =>
+    Object.fromEntries(
+      Object.keys(defaultHairAdjustments).map((id) => [
+        id,
+        { ...defaultHairAdjustment, ...(raw[id] || {}) },
+      ]),
+    );
 let hairAdjustments;
 try {
-  hairAdjustments = {
-    ...defaultHairAdjustments,
-    ...JSON.parse(localStorage.getItem(HAIR_ADJUST_KEY) || "{}"),
-  };
+  hairAdjustments = normalizeHairAdjustments(
+    JSON.parse(localStorage.getItem(HAIR_ADJUST_KEY) || "{}"),
+  );
 } catch {
   hairAdjustments = structuredClone(defaultHairAdjustments);
 }
@@ -540,7 +549,7 @@ async function loadMapping() {
     const raw = await response.json();
     const v = raw.mapping || raw;
     if (raw.hairAdjustments)
-      hairAdjustments = { ...defaultHairAdjustments, ...raw.hairAdjustments };
+      hairAdjustments = normalizeHairAdjustments(raw.hairAdjustments);
 
     if (v?.version === 3) {
       v.version = 4;
@@ -1195,10 +1204,29 @@ function drawAdjustedHair(index, x, y) {
   ctx.save();
   ctx.translate(pivotX + adjustment.x, pivotY + adjustment.y);
   ctx.rotate((adjustment.rotation * Math.PI) / 180);
-  ctx.scale(adjustment.scale, adjustment.scale);
+  ctx.scale(
+    adjustment.scale * (adjustment.lockAspect === false ? adjustment.scaleX : 1),
+    adjustment.scale * (adjustment.lockAspect === false ? adjustment.scaleY : 1),
+  );
   ctx.translate(-pivotX, -pivotY);
   drawFlexSprite(hairFrontV3, def, hairSprings[index].value, x, y);
   ctx.restore();
+}
+function drawAdjustedHairLayer(front, x, y) {
+  const order = assembledHair
+    .map((_, i) => i)
+    .filter((i) =>
+      front
+        ? (Number(hairAdjustments[hairPartId(i)]?.layer) || 0) >= 0
+        : (Number(hairAdjustments[hairPartId(i)]?.layer) || 0) < 0,
+    )
+    .sort(
+      (a, b) =>
+        (Number(hairAdjustments[hairPartId(a)]?.layer) || 0) -
+          (Number(hairAdjustments[hairPartId(b)]?.layer) || 0) ||
+        a - b,
+    );
+  for (const i of order) drawAdjustedHair(i, x, y);
 }
 function drawBackHair(x, y) {
   ctx.save();
@@ -1359,6 +1387,7 @@ function render(now) {
   ctx.rotate(rot * 0.55);
   ctx.translate(-627, -1190);
   outlinedLayer(() => drawBackHair(x, y));
+  outlinedLayer(() => drawAdjustedHairLayer(false, x, y));
   outlinedLayer(() => {
     const bodyY = y + sway.neck * 7;
     draw(baseNoNose, x, bodyY);
@@ -1396,8 +1425,7 @@ function render(now) {
     );
   });
   outlinedLayer(() => {
-    for (let i = 1; i < assembledHair.length; i++) drawAdjustedHair(i, x, y);
-    drawAdjustedHair(0, x, y);
+    drawAdjustedHairLayer(true, x, y);
   });
   ctx.restore();
   ctx = displayCtx;
@@ -1599,6 +1627,9 @@ const hairControls = [
   ["x", "左右位置", -180, 180, 1],
   ["y", "上下位置", -180, 180, 1],
   ["scale", "大きさ", 0.5, 1.6, 0.01],
+  ["scaleX", "横幅倍率", 0.35, 2.5, 0.01],
+  ["scaleY", "縦幅倍率", 0.35, 2.5, 0.01],
+  ["layer", "描画順（奥 ↔ 手前）", -20, 20, 1],
   ["rotation", "角度", -45, 45, 0.5],
   ["sway", "揺れの強さ", 0, 3, 0.05],
 ];
@@ -1626,6 +1657,13 @@ function makeAdjustSlider(host, key, label, min, max, step, source, save) {
   };
   wrap.append(name, output, input);
   host.append(wrap);
+}
+function makeAdjustAspectToggle(host, source, save) {
+  const label = document.createElement("label"), input = document.createElement("input");
+  label.className = "part-control"; input.type = "checkbox"; input.checked = source.lockAspect !== false;
+  label.append(input, document.createTextNode("縦横比を固定"));
+  input.onchange = () => { source.lockAspect = input.checked; save(); buildAdjuster(); };
+  host.append(label);
 }
 function selectAdjustPart(id) {
   selectedAdjustPart = id;
@@ -1672,8 +1710,11 @@ function buildAdjuster() {
           : mapping.visual,
     save = def.source === "hair" ? saveHairAdjustments : saveMapping;
   $("selectedPartName").textContent = def.label;
-  for (const [key, label, min, max, step] of def.controls)
+  if (def.source === "hair") makeAdjustAspectToggle(sliders, source, save);
+  for (const [key, label, min, max, step] of def.controls) {
+    if (def.source === "hair" && source.lockAspect !== false && (key === "scaleX" || key === "scaleY")) continue;
     makeAdjustSlider(sliders, key, label, min, max, step, source, save);
+  }
 }
 function drawAdjustHighlight(now) {
   if (now > adjustHighlightUntil) return;
@@ -1686,12 +1727,14 @@ function drawAdjustHighlight(now) {
   if (def?.source === "hair") {
     const index = def.hairId === "ahoge" ? 0 : Number(def.hairId.split("-")[1]),
       [x, y, w, h] = assembledHair[index].dst,
-      a = hairAdjustments[def.hairId];
+      a = hairAdjustments[def.hairId],
+      scaleX = a.scale * (a.lockAspect === false ? a.scaleX : 1),
+      scaleY = a.scale * (a.lockAspect === false ? a.scaleY : 1);
     adjustCtx.strokeRect(
       x + a.x - 8,
       y + a.y - 8,
-      w * a.scale + 16,
-      h * a.scale + 16,
+      w * scaleX + 16,
+      h * scaleY + 16,
     );
   } else {
     const boxes = {
@@ -1727,12 +1770,14 @@ adjustCanvas.addEventListener("pointerdown", (event) => {
   if (y < 760) {
     for (let i = assembledHair.length - 1; i >= 0; i--) {
       const [hx, hy, hw, hh] = assembledHair[i].dst,
-        a = hairAdjustments[hairPartId(i)];
+        a = hairAdjustments[hairPartId(i)],
+        scaleX = a.scale * (a.lockAspect === false ? a.scaleX : 1),
+        scaleY = a.scale * (a.lockAspect === false ? a.scaleY : 1);
       if (
         x >= hx + a.x &&
-        x <= hx + a.x + hw * a.scale &&
+        x <= hx + a.x + hw * scaleX &&
         y >= hy + a.y &&
-        y <= hy + a.y + hh * a.scale
+        y <= hy + a.y + hh * scaleY
       )
         return selectAdjustPart(i === 0 ? "__ahoge" : `__hair${i}`);
     }
@@ -1806,7 +1851,7 @@ $("importJson").onchange = async (e) => {
       visual: { ...defaultVisual, ...next.visual },
     };
     if (raw.hairAdjustments)
-      hairAdjustments = { ...defaultHairAdjustments, ...raw.hairAdjustments };
+      hairAdjustments = normalizeHairAdjustments(raw.hairAdjustments);
     localStorage.setItem(HAIR_ADJUST_KEY, JSON.stringify(hairAdjustments));
     saveMapping();
     closeCapture();

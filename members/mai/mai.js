@@ -217,6 +217,10 @@ const defaultHairAdjustment = () => ({
   x: 0,
   y: 0,
   scale: 1,
+  lockAspect: true,
+  scaleX: 1,
+  scaleY: 1,
+  layer: 0,
   rotation: 0,
   sway: 1,
 });
@@ -1157,9 +1161,9 @@ function drawFlexSprite(atlas, def, bend, x, y) {
 }
 function drawHairGroup(group, x, y, now, hit = false) {
   const groupY = 0;
-  for (let i = 0; i < hairPieceDefs.length; i++) {
+  const ordered = hairPieceDefs.map((_, i) => i).filter((i) => { const p = hairPieceDefs[i], layer = Number(hairAdjustments[p.id].layer) || 0; return (layer < 0 ? "back" : layer > 0 ? "front" : p.group) === group; }).sort((a, b) => (Number(hairAdjustments[hairPieceDefs[a].id].layer) || 0) - (Number(hairAdjustments[hairPieceDefs[b].id].layer) || 0) || a - b);
+  for (const i of ordered) {
     const p = hairPieceDefs[i];
-    if (p.group !== group) continue;
     const m = hairPieceMotion[i],
       a = hairAdjustments[p.id],
       px = p.pivot[0],
@@ -1179,7 +1183,7 @@ function drawHairGroup(group, x, y, now, hit = false) {
       Math.sin(m.phase + now * 0.0012) * p.weight * 0.55 * swayAmount,
       0,
     );
-    ctx.scale(a.scale, a.scale);
+    ctx.scale(a.scale * (a.lockAspect === false ? a.scaleX : 1), a.scale * (a.lockAspect === false ? a.scaleY : 1));
     ctx.drawImage(hit ? hairHitImages[i] : p.img, -px, -py);
     ctx.restore();
   }
@@ -1562,6 +1566,9 @@ const partControlDefs = [
   ["x", "左右位置", -220, 220, 1],
   ["y", "上下位置", -220, 220, 1],
   ["scale", "大きさ", 0.45, 1.65, 0.01],
+  ["scaleX", "横幅倍率", 0.35, 2.5, 0.01],
+  ["scaleY", "縦幅倍率", 0.35, 2.5, 0.01],
+  ["layer", "描画順（奥 ↔ 手前）", -20, 20, 1],
   ["rotation", "角度", -45, 45, 0.5],
   ["sway", "揺れやすさ", 0, 3, 0.05],
 ];
@@ -1640,6 +1647,13 @@ function makeSlider(host, key, label, min, max, step, value, oninput) {
   };
   wrap.append(name, output, input);
   host.append(wrap);
+}
+function makeAspectToggle(host, values) {
+  const label = document.createElement("label"), input = document.createElement("input");
+  label.className = "part-control"; input.type = "checkbox"; input.checked = values.lockAspect !== false;
+  label.append(input, document.createTextNode("縦横比を固定"));
+  input.onchange = () => { values.lockAspect = input.checked; saveHairAdjustments(); buildAdjuster(); };
+  host.append(label);
 }
 function buildAdjuster() {
   const list = $("partList"),
@@ -1724,11 +1738,14 @@ function buildAdjuster() {
       hairPieceDefs.find((p) => p.id === selectedHairId) || hairPieceDefs[0],
     values = hairAdjustments[part.id];
   $("selectedPartName").textContent = part.label;
-  for (const [key, label, min, max, step] of partControlDefs)
+  makeAspectToggle(controls, values);
+  for (const [key, label, min, max, step] of partControlDefs) {
+    if (values.lockAspect !== false && (key === "scaleX" || key === "scaleY")) continue;
     makeSlider(controls, key, label, min, max, step, values[key], (value) => {
       values[key] = value;
       saveHairAdjustments();
     });
+  }
 }
 adjustCanvas.addEventListener("pointerdown", (event) => {
   const rect = adjustCanvas.getBoundingClientRect(),

@@ -9,7 +9,8 @@ import {
   Tray,
 } from "electron";
 import updater from "electron-updater";
-import { join } from "node:path";
+import { spawn } from "node:child_process";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const { autoUpdater } = updater;
@@ -23,6 +24,8 @@ const baseUrl = "http://127.0.0.1:8777";
 let mainWindow,
   tray,
   manualUpdateCheck = false,
+  macUpdateOnQuit = null,
+  macUpdateStarted = false,
   quitting = false;
 const trackers = new Map();
 const appIcon = nativeImage.createFromPath(
@@ -133,6 +136,54 @@ async function checkForUpdates(showResult = true) {
   }
 }
 
+function startMacUpdateInstaller(downloadedFile) {
+  if (process.platform !== "darwin" || macUpdateStarted) return false;
+  macUpdateStarted = true;
+  const executable = app.getPath("exe"),
+    appBundle = dirname(dirname(dirname(executable))),
+    logFile = join(app.getPath("userData"), "updater-install.log"),
+    script = String.raw`
+pid="$1"
+archive="$2"
+app_path="$3"
+log_file="$4"
+exec >>"$log_file" 2>&1
+echo "$(date '+%Y-%m-%d %H:%M:%S') update start: $archive"
+while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done
+work_dir="$(mktemp -d -t raft-vtuber-update.XXXXXX)" || exit 20
+backup_path="\${app_path}.update-backup"
+cleanup() { rm -rf "$work_dir"; }
+trap cleanup EXIT
+/usr/bin/ditto -x -k "$archive" "$work_dir" || exit 21
+new_app="$work_dir/$(basename "$app_path")"
+[[ -d "$new_app" ]] || exit 22
+rm -rf "$backup_path"
+mv "$app_path" "$backup_path" || exit 23
+if mv "$new_app" "$app_path"; then
+  /usr/bin/xattr -dr com.apple.quarantine "$app_path" 2>/dev/null || true
+  /usr/bin/open "$app_path"
+  open_status=$?
+  if [[ $open_status -eq 0 ]]; then
+    rm -rf "$backup_path"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') update success"
+    exit 0
+  fi
+fi
+rm -rf "$app_path"
+mv "$backup_path" "$app_path"
+/usr/bin/open "$app_path"
+echo "$(date '+%Y-%m-%d %H:%M:%S') update failed and rolled back"
+exit 24
+`;
+  const child = spawn(
+    "/bin/zsh",
+    ["-c", script, "raft-vtuber-updater", String(process.pid), downloadedFile, appBundle, logFile],
+    { detached: true, stdio: "ignore" },
+  );
+  child.unref();
+  return true;
+}
+
 app.on("second-instance", showMain);
 
 await app.whenReady();
@@ -204,7 +255,16 @@ autoUpdater.on("update-not-available", async () => {
 autoUpdater.on("update-available", () => {
   manualUpdateCheck = false;
 });
-autoUpdater.on("update-downloaded", async () => {
+autoUpdater.on("error", async (error) => {
+  manualUpdateCheck = false;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  await dialog.showMessageBox(mainWindow, {
+    type: "warning",
+    message: "アップデート処理でエラーが発生しました。",
+    detail: String(error?.message || error),
+  });
+});
+autoUpdater.on("update-downloaded", async (event) => {
   const result = await dialog.showMessageBox(mainWindow, {
     type: "info",
     buttons: ["今すぐ再起動して更新", "終了時に更新"],
@@ -214,7 +274,12 @@ autoUpdater.on("update-downloaded", async () => {
   });
   if (result.response === 0) {
     quitting = true;
-    autoUpdater.quitAndInstall();
+    if (process.platform === "darwin") {
+      if (!startMacUpdateInstaller(event.downloadedFile)) quitting = false;
+      else app.quit();
+    } else autoUpdater.quitAndInstall(false, true);
+  } else if (process.platform === "darwin") {
+    macUpdateOnQuit = event.downloadedFile;
   }
 });
 setTimeout(() => checkForUpdates(false), 3000);
@@ -223,4 +288,6 @@ app.on("activate", showMain);
 app.on("window-all-closed", () => {});
 app.on("before-quit", () => {
   quitting = true;
+  if (macUpdateOnQuit && !macUpdateStarted)
+    startMacUpdateInstaller(macUpdateOnQuit);
 });

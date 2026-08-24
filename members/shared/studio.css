@@ -438,6 +438,14 @@ dialog::backdrop {
   grid-column: 1/-1;
   width: 100%;
 }
+.part-control input[type="checkbox"] {
+  grid-column: auto;
+  grid-row: 1;
+  width: 20px;
+  height: 20px;
+  justify-self: end;
+  accent-color: #54b9aa;
+}
 @media (max-width: 760px) {
   .adjust-workspace {
     grid-template-columns: 145px minmax(170px, 1fr) 185px;

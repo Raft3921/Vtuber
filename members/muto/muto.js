@@ -75,7 +75,7 @@ const files = [
     "rig-atlas",
     "eye-expressions",
     "mouth-speech-16-v3",
-    "eye-shapes-muto-v3",
+    "eye-shapes-muto-single-v5",
   ],
   art = {},
   sharedFiles = new Set([
@@ -169,6 +169,10 @@ const defaultHairAdjustment = () => ({
   x: 0,
   y: 0,
   scale: 1,
+  lockAspect: true,
+  scaleX: 1,
+  scaleY: 1,
+  layer: 0,
   rotation: 0,
   sway: 1,
 });
@@ -245,7 +249,7 @@ for (let i = 0; i < 16; i++)
     ),
   );
 const speechBounds = speechMouths.map(contentBounds);
-const shapeAtlas = art["eye-shapes-muto-v3"],
+const shapeAtlas = art["eye-shapes-muto-single-v5"],
   shapeCellW = shapeAtlas.width / 3,
   shapeCellH = shapeAtlas.height / 2,
   shapePairs = [];
@@ -257,10 +261,14 @@ for (let i = 0; i < 6; i++) {
     shapeCellW - 12,
     shapeCellH - 12,
   );
-  shapePairs.push([
-    crop(cell, 0, 0, cell.width / 2, cell.height),
-    crop(cell, cell.width / 2, 0, cell.width / 2, cell.height),
-  ]);
+  const mirrored = document.createElement("canvas");
+  mirrored.width = cell.width;
+  mirrored.height = cell.height;
+  const mirroredCtx = mirrored.getContext("2d");
+  mirroredCtx.translate(cell.width, 0);
+  mirroredCtx.scale(-1, 1);
+  mirroredCtx.drawImage(cell, 0, 0);
+  shapePairs.push([cell, mirrored]);
 }
 const shapeBounds = shapePairs.map((p) => p.map(contentBounds));
 const shapeWhiteMasks = shapePairs.map((pair) =>
@@ -283,19 +291,6 @@ const shapeWhiteMasks = shapePairs.map((pair) =>
   ),
   irisLayer = document.createElement("canvas"),
   irisCtx = irisLayer.getContext("2d");
-// 瞬き素材の白い四角形は描画せず、透過した瞼・瞼線だけを残す。
-for (const pair of shapePairs)
-  for (const part of pair) {
-    const g = part.getContext("2d"),
-      pixels = g.getImageData(0, 0, part.width, part.height);
-    for (let i = 0; i < pixels.data.length; i += 4)
-      if (
-        pixels.data[i] > 185 &&
-        pixels.data[i + 1] > 185 &&
-        pixels.data[i + 2] > 185
-      ) pixels.data[i + 3] = 0;
-    g.putImageData(pixels, 0, 0);
-  }
 irisLayer.width = irisLayer.height = 1254;
 const whitePairs = [
     crop(
@@ -830,24 +825,17 @@ function anchoredOn(g, img, b, x, y, w) {
   g.drawImage(img, b.x, b.y, b.w, b.h, -b.w / 2, -b.h / 2, b.w, b.h);
   g.restore();
 }
-function drawMutoSclera(side, stage, x, y) {
-  if (stage >= 5) return;
+function drawAdjustedEyeOn(g, img, bounds, side, x, y) {
   const key = side ? "right" : "left",
     adjustment = sclera[key],
-    blink = [1, 0.9, 0.72, 0.5, 0.24, 0][stage],
     cx = 627 + ((side ? 1 : -1) * mapping.layout.eyeGap) / 2 + x + adjustment.x,
-    cy = mapping.layout.eyeY + y + adjustment.y,
-    width = 62 * adjustment.scale,
-    height = Math.max(3, 45 * adjustment.scale * blink);
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate((adjustment.rotation * Math.PI) / 180);
-  ctx.beginPath();
-  ctx.ellipse(0, 0, width, height, 0, 0, Math.PI * 2);
-  ctx.ellipse((side ? -1 : 1) * width * 0.43, 0, width * 0.78, height * 0.82, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "#fff";
-  ctx.fill("evenodd");
-  ctx.restore();
+    cy = mapping.layout.eyeY + y + adjustment.y;
+  g.save();
+  g.translate(cx, cy);
+  g.rotate((adjustment.rotation * Math.PI) / 180);
+  g.scale(adjustment.scale, adjustment.scale);
+  anchoredOn(g, img, bounds, 0, 0, 118);
+  g.restore();
 }
 function drawBlinkAsset(assetId, x, y) {
   const stage =
@@ -859,14 +847,14 @@ function drawBlinkAsset(assetId, x, y) {
   ctx.rotate((mapping.layout.eyeRotation * Math.PI) / 180);
   ctx.scale(mapping.layout.eyeScale, mapping.layout.eyeScale);
   ctx.translate(-(627 + x), -(mapping.layout.eyeY + y));
-  for (let side = 0; side < 2; side++) drawMutoSclera(side, stage, x, y);
   for (let side = 0; side < 2; side++)
-    anchored(
+    drawAdjustedEyeOn(
+      ctx,
       shapePairs[stage][side],
       shapeBounds[stage][side],
-      627 + ((side ? 1 : -1) * mapping.layout.eyeGap) / 2 + x,
-      mapping.layout.eyeY + y,
-      118,
+      side,
+      x,
+      y,
     );
   ctx.restore();
   if (stage >= 5) return;
@@ -877,34 +865,28 @@ function drawBlinkAsset(assetId, x, y) {
   irisCtx.rotate((mapping.layout.eyeRotation * Math.PI) / 180);
   irisCtx.scale(mapping.layout.eyeScale, mapping.layout.eyeScale);
   irisCtx.translate(-(627 + x), -(mapping.layout.eyeY + y));
+  for (let side = 0; side < 2; side++)
+    drawAdjustedEyeOn(
+      irisCtx,
+      shapeWhiteMasks[stage][side],
+      shapeBounds[stage][side],
+      side,
+      x,
+      y,
+    );
+  irisCtx.globalCompositeOperation = "source-atop";
   for (let side = 0; side < 2; side++) {
-    const key = side ? "right" : "left",
-      adjustment = sclera[key],
-      blink = [1, 0.9, 0.72, 0.5, 0.24, 0][stage],
-      scleraX = 627 + ((side ? 1 : -1) * mapping.layout.eyeGap) / 2 + x + adjustment.x,
-      scleraY = mapping.layout.eyeY + y + adjustment.y,
-      width = 62 * adjustment.scale,
-      height = Math.max(3, 45 * adjustment.scale * blink),
-      cx = 627 + ((side ? 1 : -1) * mapping.layout.irisGap) / 2 + x,
-      cy = mapping.layout.eyeY + mapping.layout.irisY + y;
-    irisCtx.save();
-    irisCtx.translate(scleraX, scleraY);
-    irisCtx.rotate((adjustment.rotation * Math.PI) / 180);
-    irisCtx.beginPath();
-    irisCtx.ellipse(0, 0, width, height, 0, 0, Math.PI * 2);
-    irisCtx.ellipse((side ? -1 : 1) * width * 0.43, 0, width * 0.78, height * 0.82, 0, 0, Math.PI * 2);
-    irisCtx.clip("evenodd");
-    irisCtx.rotate((-adjustment.rotation * Math.PI) / 180);
-    irisCtx.translate(-scleraX, -scleraY);
+    const adjustment = sclera[side ? "right" : "left"],
+      cx = 627 + ((side ? 1 : -1) * mapping.layout.irisGap) / 2 + x + adjustment.x,
+      cy = mapping.layout.eyeY + mapping.layout.irisY + y + adjustment.y;
     anchoredOn(
       irisCtx,
       irisPairs[side],
       irisPairBounds[side],
       cx + pose.gazeX * 11,
       cy + pose.gazeY * 6,
-      mapping.layout.irisSize,
+      mapping.layout.irisSize * adjustment.scale,
     );
-    irisCtx.restore();
   }
   irisCtx.globalCompositeOperation = "source-over";
   irisCtx.restore();
@@ -1156,11 +1138,11 @@ function drawFlexSprite(atlas, def, bend, x, y) {
   }
 }
 function drawHairGroup(group, x, y, now, hit = false) {
-  const groupY = group === "front" ? 28 : 0;
-  for (let i = 0; i < hairPieceDefs.length; i++) {
+  const ordered = hairPieceDefs.map((_, i) => i).filter((i) => { const p = hairPieceDefs[i], layer = Number(hairAdjustments[p.id].layer) || 0; return (layer < 0 ? "back" : layer > 0 ? "front" : p.group) === group; }).sort((a, b) => (Number(hairAdjustments[hairPieceDefs[a].id].layer) || 0) - (Number(hairAdjustments[hairPieceDefs[b].id].layer) || 0) || a - b);
+  for (const i of ordered) {
     const p = hairPieceDefs[i];
-    if (p.group !== group) continue;
-    const m = hairPieceMotion[i],
+    const groupY = p.group === "front" ? 28 : 0,
+      m = hairPieceMotion[i],
       a = hairAdjustments[p.id],
       px = p.pivot[0],
       py = p.pivot[1],
@@ -1179,7 +1161,7 @@ function drawHairGroup(group, x, y, now, hit = false) {
       Math.sin(m.phase + now * 0.0012) * p.weight * 0.55 * swayAmount,
       0,
     );
-    ctx.scale(a.scale, a.scale);
+    ctx.scale(a.scale * (a.lockAspect === false ? a.scaleX : 1), a.scale * (a.lockAspect === false ? a.scaleY : 1));
     ctx.drawImage(hit ? hairHitImages[i] : p.img, -px, -py);
     ctx.restore();
   }
@@ -1562,6 +1544,9 @@ const partControlDefs = [
   ["x", "左右位置", -220, 220, 1],
   ["y", "上下位置", -220, 220, 1],
   ["scale", "大きさ", 0.45, 1.65, 0.01],
+  ["scaleX", "横幅倍率", 0.35, 2.5, 0.01],
+  ["scaleY", "縦幅倍率", 0.35, 2.5, 0.01],
+  ["layer", "描画順（奥 ↔ 手前）", -20, 20, 1],
   ["rotation", "角度", -45, 45, 0.5],
   ["sway", "揺れやすさ", 0, 3, 0.05],
 ];
@@ -1657,6 +1642,13 @@ function makeSlider(host, key, label, min, max, step, value, oninput) {
   wrap.append(name, output, input);
   host.append(wrap);
 }
+function makeAspectToggle(host, values) {
+  const label = document.createElement("label"), input = document.createElement("input");
+  label.className = "part-control"; input.type = "checkbox"; input.checked = values.lockAspect !== false;
+  label.append(input, document.createTextNode("縦横比を固定"));
+  input.onchange = () => { values.lockAspect = input.checked; saveHairAdjustments(); buildAdjuster(); };
+  host.append(label);
+}
 function buildAdjuster() {
   const list = $("partList"),
     controls = $("partSliders");
@@ -1740,11 +1732,14 @@ function buildAdjuster() {
       hairPieceDefs.find((p) => p.id === selectedHairId) || hairPieceDefs[0],
     values = hairAdjustments[part.id];
   $("selectedPartName").textContent = part.label;
-  for (const [key, label, min, max, step] of partControlDefs)
+  makeAspectToggle(controls, values);
+  for (const [key, label, min, max, step] of partControlDefs) {
+    if (values.lockAspect !== false && (key === "scaleX" || key === "scaleY")) continue;
     makeSlider(controls, key, label, min, max, step, values[key], (value) => {
       values[key] = value;
       saveHairAdjustments();
     });
+  }
 }
 adjustCanvas.addEventListener("pointerdown", (event) => {
   const rect = adjustCanvas.getBoundingClientRect(),
