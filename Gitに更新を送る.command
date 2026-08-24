@@ -32,23 +32,18 @@ print "現在の変更一覧:"
 git status --short
 print ""
 
-read -r "COMMIT_MESSAGE?コミットメッセージ: "
-if [[ -z "${COMMIT_MESSAGE//[[:space:]]/}" ]]; then
-  COMMIT_MESSAGE="更新 $(date '+%Y-%m-%d %H:%M:%S')"
-fi
-
-# GitHub Releases で使うバージョンを決める。現在版が未公開ならそのまま、
-# すでにタグがある場合は patch 番号を自動で上げる。
+# GitHub上のタグを取得したうえで、現在の patch 番号を必ず1つ上げる。
 git fetch --tags origin || fail "GitHub からバージョン情報を取得できません。認証と通信状態を確認してください。"
 
 APP_VERSION="$(node -p "require('./package.json').version" 2>/dev/null)"
 [[ "$APP_VERSION" == <->.<->.<-> ]] || fail "package.json のバージョン形式が正しくありません。"
+NEXT_VERSION="$(APP_VERSION="$APP_VERSION" node -p 'const [major, minor, patch] = process.env.APP_VERSION.split(".").map(Number); `${major}.${minor}.${patch + 1}`')"
+RELEASE_TAG="v$NEXT_VERSION"
+git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null && fail "$RELEASE_TAG はすでに存在します。package.json のバージョンを確認してください。"
+npm version patch --no-git-tag-version || fail "次のバージョン番号を作成できませんでした。"
+APP_VERSION="$(node -p "require('./package.json').version")"
 RELEASE_TAG="v$APP_VERSION"
-while git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; do
-  npm version patch --no-git-tag-version || fail "次のバージョン番号を作成できませんでした。"
-  APP_VERSION="$(node -p "require('./package.json').version")"
-  RELEASE_TAG="v$APP_VERSION"
-done
+COMMIT_MESSAGE="バージョン${APP_VERSION}です"
 
 APP_VERSION="$APP_VERSION" node -e '
   const fs = require("fs");
@@ -57,6 +52,7 @@ APP_VERSION="$APP_VERSION" node -e '
 
 print ""
 print "公開バージョン: $RELEASE_TAG"
+print "コミットメッセージ: $COMMIT_MESSAGE"
 
 git add -A || fail "変更をステージできませんでした。"
 
