@@ -2,7 +2,7 @@
 <header><div><small>無残のラフト</small><h1>VTuberスタジオ</h1><p>1回の起動で、メンバーのカメラ画面とOBS表示をまとめて配信します。</p></div><span class="server"><i></i>サーバー起動中</span></header>
 <main><section class="members" id="members"></section><aside><h2>使い方</h2><ol><li>出演者の「カメラ」を開く</li><li>カメラを開始して追跡する</li><li>OBSへGBかBBのURLを追加</li></ol><p>OBSではソースの種類を「ブラウザ」にします。幅・高さは1000×1000がおすすめです。</p></aside></main>
 <script>
-const data=[['1','ラフト',1],['2','まい',0],['3','たぬつな',1],['4','やんさん',0],['5','ムート',0],['6','もろん',0],['7','ウィーク',1]];
+const data=[['1','ラフト',1,'raft'],['2','まい',1,'mai'],['3','たぬつな',1,'tanutsuna'],['4','やんさん',1,'yansan'],['5','ムート',1,'muto'],['6','もろん',1,'moron'],['7','ウィーク',1,'week']];
 const root=document.querySelector('#members');
-for(const [no,name,ready] of data){const path=no==='1'?'/raft/':no==='3'?'/tanutsuna/':no==='7'?'/week/':'';const card=document.createElement('article');card.className=ready?'ready':'pending';card.innerHTML=`<b>No.${no}</b><h2>${name}</h2><span>${ready?'使用可能':'素材準備中'}</span><div>${ready?`<a href="${path}">カメラ</a><a href="${path}?obs=1&bg=transparent&member=${no}">OBS・透過</a><a href="${path}?obs=1&bg=green&member=${no}">OBS・GB</a><a href="${path}?obs=1&bg=blue&member=${no}">OBS・BB</a>`:'<button disabled>準備中</button>'}</div>`;root.append(card);}
+for(const [no,name,ready,slug] of data){const path=`/${slug}/`;const card=document.createElement('article');card.className=ready?'ready':'pending';card.innerHTML=`<b>No.${no}</b><h2>${name}</h2><span>${ready?'使用可能':'素材準備中'}</span><div>${ready?`<a href="${path}">カメラ</a><a href="${path}?obs=1&bg=transparent&member=${no}">OBS・透過</a><a href="${path}?obs=1&bg=green&member=${no}">OBS・GB</a><a href="${path}?obs=1&bg=blue&member=${no}">OBS・BB</a>`:'<button disabled>準備中</button>'}</div>`;root.append(card);}
 </script></body></html>

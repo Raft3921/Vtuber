@@ -84,10 +84,14 @@ function makeTray() {
         label: "No.1 ラフト追従を開く",
         click: () => openTracker("/raft/", "ラフト追従"),
       },
+      { label: "No.2 まい追従を開く", click: () => openTracker("/mai/", "まい追従") },
       {
         label: "No.3 たぬつな追従を開く",
         click: () => openTracker("/tanutsuna/", "たぬつな追従"),
       },
+      { label: "No.4 やんさん追従を開く", click: () => openTracker("/yansan/", "やんさん追従") },
+      { label: "No.5 ムート追従を開く", click: () => openTracker("/muto/", "ムート追従") },
+      { label: "No.6 もろん追従を開く", click: () => openTracker("/moron/", "もろん追従") },
       {
         label: "No.7 ウィーク追従を開く",
         click: () => openTracker("/week/", "ウィーク追従"),
@@ -175,18 +179,16 @@ mainWindow.webContents.on("will-navigate", (event, url) => {
   if (
     target.origin !== baseUrl ||
     target.searchParams.get("obs") === "1" ||
-    !["/raft/", "/tanutsuna/", "/week/"].includes(target.pathname)
+    !["/raft/", "/mai/", "/tanutsuna/", "/yansan/", "/muto/", "/moron/", "/week/"].includes(target.pathname)
   )
     return;
   event.preventDefault();
-  openTracker(
-    target.pathname,
-    target.pathname === "/raft/"
-      ? "ラフト追従"
-      : target.pathname === "/tanutsuna/"
-        ? "たぬつな追従"
-        : "ウィーク追従",
-  );
+  const trackerTitles = {
+    "/raft/": "ラフト追従", "/mai/": "まい追従",
+    "/tanutsuna/": "たぬつな追従", "/yansan/": "やんさん追従",
+    "/muto/": "ムート追従", "/moron/": "もろん追従", "/week/": "ウィーク追従",
+  };
+  openTracker(target.pathname, trackerTitles[target.pathname]);
 });
 makeTray();
 autoUpdater.autoDownload = true;

@@ -7,12 +7,16 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 const configRoot = process.env.VTUBER_CONFIG_ROOT || join(root, "config");
 const defaultConfigRoot = join(root, "config");
 await mkdir(configRoot, { recursive: true });
+const memberConfigFiles = {
+  "1": "raft-all-settings.json",
+  "2": "mai-all-settings.json",
+  "3": "tanutsuna-all-settings.json",
+  "4": "yansan-all-settings.json",
+  "5": "muto-all-settings.json",
+  "6": "moron-all-settings.json",
+};
 const configFileForMember = (member) =>
-  member === "1"
-    ? "raft-all-settings.json"
-    : member === "3"
-      ? "tanutsuna-all-settings.json"
-      : `member-${member}-all-settings.json`;
+  memberConfigFiles[member] || `member-${member}-all-settings.json`;
 
 const weekRoot = join(root, "members", "week");
 const clients = new Map(),

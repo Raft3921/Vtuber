@@ -1,0 +1,262 @@
+{
+  "format": "vtuber-studio-settings",
+  "version": 1,
+  "member": 6,
+  "mapping": {
+    "version": 4,
+    "member": 3,
+    "eye": [
+      "blink-0",
+      "blink-1",
+      "blink-2",
+      "normal",
+      "blink-4",
+      "blink-5"
+    ],
+    "brow": [
+      "raised",
+      "relaxed",
+      "frown"
+    ],
+    "mouth": [
+      "speech-0",
+      "speech-1",
+      "speech-2",
+      "speech-3",
+      "speech-4",
+      "speech-5",
+      "speech-6",
+      "speech-7",
+      "speech-8",
+      "speech-9",
+      "speech-10",
+      "speech-11",
+      "speech-12",
+      "speech-13",
+      "speech-14",
+      "speech-15"
+    ],
+    "profiles": {
+      "eye": [
+        {
+          "eyeOpen": 1.2099459759402387
+        },
+        {
+          "eyeOpen": 1.0817235542151773
+        },
+        {
+          "eyeOpen": 0.9257207010714118
+        },
+        {
+          "eyeOpen": 0.7254143560812498
+        },
+        {
+          "eyeOpen": 0.4806079154708128
+        },
+        {
+          "eyeOpen": 0
+        }
+      ],
+      "brow": [
+        {
+          "browUp": 0.9135134617487589,
+          "frown": 0.00021277064661262557
+        },
+        {
+          "browUp": 0.26523899535338086,
+          "frown": 0.00045465696894098073
+        },
+        {
+          "browUp": 0.0046987578001183765,
+          "frown": 0.0002826252384693362
+        }
+      ],
+      "mouth": [
+        null,
+        null,
+        null,
+        {
+          "mouth": 0.27696798576420906,
+          "smile": 0.0014682445325888693,
+          "smileL": 0.0014053883496671915,
+          "smileR": 0.0015311007155105472,
+          "frown": 0.0003461091546341777,
+          "frownL": 0.0003333251806907356,
+          "frownR": 0.0003588931285776198,
+          "pucker": 0.042473528534173965,
+          "funnel": 0.024181371554732323,
+          "press": 0.012565170880407095,
+          "upperUp": 0.10839581117033958,
+          "cheekPuff": 0.000038925689295865595,
+          "dimple": 0.004285805858671665,
+          "stretch": 0.001097398198908195,
+          "shrug": 0.04413986951112747,
+          "rollLower": 0.006279961206018925
+        },
+        null,
+        null,
+        null,
+        {
+          "mouth": 0.6509484295247225,
+          "smile": 0.4065900892019272,
+          "smileL": 0.3653927743434906,
+          "smileR": 0.44778740406036377,
+          "frown": 0.00019098613847745582,
+          "frownL": 0.0001952203456312418,
+          "frownR": 0.00018675193132366985,
+          "pucker": 0.015293000265955925,
+          "funnel": 0.028112825006246567,
+          "press": 0.049145983532071114,
+          "upperUp": 0.43600764870643616,
+          "cheekPuff": 0.0007139276713132858,
+          "dimple": 0.018940990790724754,
+          "stretch": 0.01200140593573451,
+          "shrug": 0.010094588214997202,
+          "rollLower": 0.006906472612172365
+        },
+        null,
+        null,
+        null,
+        {
+          "mouth": 0.21937434082894766,
+          "smile": 0.000011887180335179437,
+          "smileL": 0.000012610384146682918,
+          "smileR": 0.000011163976523675956,
+          "frown": 0.07303156331181526,
+          "frownL": 0.06849433481693268,
+          "frownR": 0.07756879180669785,
+          "pucker": 0.6037516593933105,
+          "funnel": 0.03322722390294075,
+          "press": 0.000786242526373826,
+          "upperUp": 0.008644924033433199,
+          "cheekPuff": 0.000007379802809737157,
+          "dimple": 0.00018059492867905647,
+          "stretch": 0.002814962004777044,
+          "shrug": 0.13032767735421658,
+          "rollLower": 0.009805779904127121
+        },
+        null,
+        null,
+        null,
+        {
+          "mouth": 1,
+          "smile": 0.00790245458483696,
+          "smileL": 0.007869615219533443,
+          "smileR": 0.007935293950140476,
+          "frown": 0.002931312657892704,
+          "frownL": 0.002282323082908988,
+          "frownR": 0.00358030223287642,
+          "pucker": 0.10873565077781677,
+          "funnel": 0.3506416380405426,
+          "press": 0.008567244512960315,
+          "upperUp": 0.2008511647582054,
+          "cheekPuff": 0.0005757372127845883,
+          "dimple": 0.397997185587883,
+          "stretch": 0.0008598772110417485,
+          "shrug": 0.045299314660951495,
+          "rollLower": 0.006939547602087259
+        }
+      ]
+    },
+    "layout": {
+      "eyeGap": 204,
+      "eyeY": 614,
+      "browGap": 150,
+      "browY": 5,
+      "browTilt": 40,
+      "irisGap": 172,
+      "irisY": 0,
+      "irisSize": 46,
+      "noseY": 0,
+      "mouthY": 0,
+      "mouthScale": 1.15
+    },
+    "visual": {
+      "outlineLayers": 2,
+      "outlineWidth": 10,
+      "outlineColor1": "#ffffff",
+      "outlineColor2": "#000000",
+      "outlineColor3": "#f3d57b",
+      "backHairBrightness": 0.65,
+      "paintDepth": 0.55,
+      "hairMotion": 1,
+      "clothMotion": 3,
+      "stringMotion": 3,
+      "earTwitchFrequency": 3,
+      "earTwitchStrength": 3,
+      "ahogeMotion": 3,
+      "hairPart1": 2.4,
+      "hairPart2": 1.8,
+      "hairPart3": 3,
+      "hairPart4": 3,
+      "hairPart5": 3,
+      "hairPart6": 2.25,
+      "hairPart7": 1.75
+    }
+  },
+  "hairAdjustments": {
+    "back-left": {
+      "x": 0,
+      "y": 0,
+      "scale": 1,
+      "rotation": 0,
+      "sway": 2.4
+    },
+    "back-center": {
+      "x": -29,
+      "y": 36,
+      "scale": 0.94,
+      "rotation": 0,
+      "sway": 2.4
+    },
+    "back-right": {
+      "x": -54,
+      "y": -54,
+      "scale": 0.9,
+      "rotation": 0,
+      "sway": 3
+    },
+    "upper-left": {
+      "x": 29,
+      "y": 51,
+      "scale": 1.18,
+      "rotation": -13,
+      "sway": 3
+    },
+    "upper-center": {
+      "x": -22,
+      "y": 70,
+      "scale": 1.65,
+      "rotation": 0,
+      "sway": 3
+    },
+    "upper-right": {
+      "x": -97,
+      "y": 45,
+      "scale": 1.09,
+      "rotation": 29.5,
+      "sway": 2.25
+    },
+    "front-left": {
+      "x": 0,
+      "y": 27,
+      "scale": 1,
+      "rotation": 0,
+      "sway": 3
+    },
+    "front-center": {
+      "x": -53,
+      "y": -4,
+      "scale": 1.07,
+      "rotation": 0,
+      "sway": 3
+    },
+    "front-right": {
+      "x": -93,
+      "y": 24,
+      "scale": 0.93,
+      "rotation": 8,
+      "sway": 3
+    }
+  }
+}
