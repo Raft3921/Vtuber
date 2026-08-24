@@ -17,6 +17,8 @@ fail() {
 }
 
 command -v git >/dev/null 2>&1 || fail "Git がインストールされていません。"
+command -v node >/dev/null 2>&1 || fail "Node.js がインストールされていません。"
+command -v npm >/dev/null 2>&1 || fail "npm がインストールされていません。"
 cd "$SCRIPT_DIR" || fail "プロジェクトフォルダーに移動できません。"
 
 GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || fail "このフォルダーは Git リポジトリではありません。"
@@ -35,6 +37,27 @@ if [[ -z "${COMMIT_MESSAGE//[[:space:]]/}" ]]; then
   COMMIT_MESSAGE="更新 $(date '+%Y-%m-%d %H:%M:%S')"
 fi
 
+# GitHub Releases で使うバージョンを決める。現在版が未公開ならそのまま、
+# すでにタグがある場合は patch 番号を自動で上げる。
+git fetch --tags origin || fail "GitHub からバージョン情報を取得できません。認証と通信状態を確認してください。"
+
+APP_VERSION="$(node -p "require('./package.json').version" 2>/dev/null)"
+[[ "$APP_VERSION" == <->.<->.<-> ]] || fail "package.json のバージョン形式が正しくありません。"
+RELEASE_TAG="v$APP_VERSION"
+while git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; do
+  npm version patch --no-git-tag-version || fail "次のバージョン番号を作成できませんでした。"
+  APP_VERSION="$(node -p "require('./package.json').version")"
+  RELEASE_TAG="v$APP_VERSION"
+done
+
+APP_VERSION="$APP_VERSION" node -e '
+  const fs = require("fs");
+  fs.writeFileSync("version.json", JSON.stringify({ version: process.env.APP_VERSION }, null, 2) + "\n");
+' || fail "version.json を更新できませんでした。"
+
+print ""
+print "公開バージョン: $RELEASE_TAG"
+
 git add -A || fail "変更をステージできませんでした。"
 
 if git diff --cached --quiet; then
@@ -49,18 +72,27 @@ BRANCH="$(git branch --show-current)"
 PUSH_LOG="$(mktemp -t vtuber-git-push.XXXXXX)" || fail "一時ファイルを作成できません。"
 if git push origin "$BRANCH" 2> >(tee "$PUSH_LOG" >&2); then
   rm -f "$PUSH_LOG"
-  print ""
-  print "成功: $BRANCH ブランチを origin へ送信しました。"
-  finish
-  exit 0
+else
+  PUSH_ERROR="$(<"$PUSH_LOG")"
+  rm -f "$PUSH_LOG"
+  if [[ "$PUSH_ERROR" == *"Authentication failed"* || "$PUSH_ERROR" == *"Permission denied"* || "$PUSH_ERROR" == *"could not read Username"* ]]; then
+    fail "Git の認証に失敗しました。アカウントやアクセス権を確認してください。"
+  elif [[ "$PUSH_ERROR" == *"Could not resolve host"* || "$PUSH_ERROR" == *"Failed to connect"* || "$PUSH_ERROR" == *"Connection timed out"* ]]; then
+    fail "通信に失敗しました。インターネット接続を確認してください。"
+  else
+    fail "push に失敗しました。Git の表示内容を確認してください。"
+  fi
 fi
 
-PUSH_ERROR="$(<"$PUSH_LOG")"
-rm -f "$PUSH_LOG"
-if [[ "$PUSH_ERROR" == *"Authentication failed"* || "$PUSH_ERROR" == *"Permission denied"* || "$PUSH_ERROR" == *"could not read Username"* ]]; then
-  fail "Git の認証に失敗しました。アカウントやアクセス権を確認してください。"
-elif [[ "$PUSH_ERROR" == *"Could not resolve host"* || "$PUSH_ERROR" == *"Failed to connect"* || "$PUSH_ERROR" == *"Connection timed out"* ]]; then
-  fail "通信に失敗しました。インターネット接続を確認してください。"
-else
-  fail "push に失敗しました。Git の表示内容を確認してください。"
+git tag -a "$RELEASE_TAG" -m "$COMMIT_MESSAGE" || fail "$RELEASE_TAG のリリースタグを作成できませんでした。"
+if ! git push origin "$RELEASE_TAG"; then
+  git tag -d "$RELEASE_TAG" >/dev/null 2>&1
+  fail "ブランチは送信されましたが、$RELEASE_TAG の送信に失敗しました。認証と通信状態を確認してください。"
 fi
+
+print ""
+print "成功: $BRANCH と $RELEASE_TAG を origin へ送信しました。"
+print "GitHub Actions がMac・Windows用インストーラーの作成を開始します。"
+print "作成完了後、旧バージョンのソフトからアップデートできます。"
+print "確認: https://github.com/Raft3921/Vtuber/actions"
+finish
