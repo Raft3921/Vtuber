@@ -1,6 +1,7 @@
 import http from "node:http";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { createReadStream } from "node:fs";
+import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
+import { extname, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
@@ -113,7 +114,11 @@ export const server = http.createServer(async (req, res) => {
       });
       res.write(`data: ${latest.get(member) || "{}"}\n\n`);
       group(member).add(res);
-      req.on("close", () => group(member).delete(res));
+      req.on("close", () => {
+        const memberClients = clients.get(member);
+        memberClients?.delete(res);
+        if (memberClients?.size === 0) clients.delete(member);
+      });
       return;
     }
     let base = root,
@@ -139,13 +144,34 @@ export const server = http.createServer(async (req, res) => {
       "",
     );
     try {
-      const data = await readFile(join(base, safe));
-      res
-        .writeHead(200, {
-          "Content-Type": mime[extname(safe)] || "application/octet-stream",
-          "Cache-Control": "no-cache",
-        })
-        .end(data);
+      if (req.method !== "GET" && req.method !== "HEAD") {
+        res.writeHead(405, { Allow: "GET, HEAD" }).end();
+        return;
+      }
+      const resolvedBase = resolve(base),
+        file = resolve(resolvedBase, `.${safe.startsWith("/") ? safe : `/${safe}`}`),
+        outside = relative(resolvedBase, file);
+      if (outside.startsWith("..") || outside === "") throw new Error("invalid path");
+      const info = await stat(file);
+      if (!info.isFile()) throw new Error("not a file");
+      const etag = `W/\"${info.size.toString(16)}-${Math.trunc(info.mtimeMs).toString(16)}\"`,
+        extension = extname(safe),
+        cacheControl = extension === ".png" ? "public, max-age=3600" : "no-cache";
+      const headers = {
+        "Content-Type": mime[extension] || "application/octet-stream",
+        "Content-Length": info.size,
+        "Cache-Control": cacheControl,
+        "Last-Modified": info.mtime.toUTCString(),
+        ETag: etag,
+        "X-Content-Type-Options": "nosniff",
+      };
+      if (req.headers["if-none-match"] === etag) {
+        res.writeHead(304, headers).end();
+        return;
+      }
+      res.writeHead(200, headers);
+      if (req.method === "HEAD") res.end();
+      else createReadStream(file).on("error", () => res.destroy()).pipe(res);
     } catch {
       res.writeHead(404).end("Not found");
     }
@@ -159,5 +185,8 @@ export const serverReady = new Promise((resolve, reject) => {
     resolve(server);
   });
 });
+
+server.keepAliveTimeout = 5000;
+server.headersTimeout = 10000;
 
 await serverReady;

@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   Menu,
   nativeImage,
@@ -15,29 +16,37 @@ import { fileURLToPath } from "node:url";
 
 const { autoUpdater } = updater;
 
-app.commandLine.appendSwitch("disable-background-timer-throttling");
-app.commandLine.appendSwitch("disable-renderer-backgrounding");
-app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 const baseUrl = "http://127.0.0.1:8777";
 let mainWindow,
   tray,
+  updateProgressWindow,
+  updateCheckInProgress = false,
+  serverCloseQuestionOpen = false,
   manualUpdateCheck = false,
   macUpdateOnQuit = null,
   macUpdateStarted = false,
+  powerSaveBlockerId = null,
   quitting = false;
 const trackers = new Map();
 const appIcon = nativeImage.createFromPath(
   fileURLToPath(new URL("./members/icon/icon.png", import.meta.url)),
 );
+const trayIcon = nativeImage.createFromDataURL(
+  `data:image/svg+xml;base64,${Buffer.from(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+      <path fill="#000" d="M1.7 2.4h3.5L9 12.1l3.8-9.7h3.5L10.6 16H7.4z"/>
+    </svg>`).toString("base64")}`,
+);
+trayIcon.setTemplateImage(true);
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   process.exit(0);
 }
 
-function windowOptions(width = 1180, height = 820) {
+function windowOptions(width = 1180, height = 820, keepActive = false) {
   return {
     width,
     height,
@@ -46,11 +55,24 @@ function windowOptions(width = 1180, height = 820) {
     backgroundColor: "#101d23",
     icon: appIcon,
     webPreferences: {
-      backgroundThrottling: false,
+      backgroundThrottling: !keepActive,
       contextIsolation: true,
       sandbox: true,
     },
   };
+}
+
+function updatePowerSaveBlocker() {
+  const needsRealtimeTracking = [...trackers.values()].some(
+    (win) => win && !win.isDestroyed(),
+  );
+  if (needsRealtimeTracking && powerSaveBlockerId === null) {
+    powerSaveBlockerId = powerSaveBlocker.start("prevent-app-suspension");
+  } else if (!needsRealtimeTracking && powerSaveBlockerId !== null) {
+    if (powerSaveBlocker.isStarted(powerSaveBlockerId))
+      powerSaveBlocker.stop(powerSaveBlockerId);
+    powerSaveBlockerId = null;
+  }
 }
 
 function openTracker(pathname, title) {
@@ -60,13 +82,13 @@ function openTracker(pathname, title) {
     win.focus();
     return win;
   }
-  win = new BrowserWindow({ ...windowOptions(1120, 800), title });
+  win = new BrowserWindow({ ...windowOptions(1120, 800, true), title });
   trackers.set(pathname, win);
+  updatePowerSaveBlocker();
   win.loadURL(`${baseUrl}${pathname}?desktop=1`);
-  win.on("close", (event) => {
-    if (quitting) return;
-    event.preventDefault();
-    win.hide();
+  win.on("closed", () => {
+    if (trackers.get(pathname) === win) trackers.delete(pathname);
+    updatePowerSaveBlocker();
   });
   return win;
 }
@@ -77,8 +99,55 @@ function showMain() {
   mainWindow.focus();
 }
 
+function updateProgressHtml(message, detail = "", percent = null) {
+  const safe = (text) => String(text).replace(
+    /[&<>"']/g,
+    (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char],
+  );
+  const progress = Number.isFinite(percent)
+    ? `<div class="bar"><i style="width:${Math.max(0, Math.min(100, percent))}%"></i></div>`
+    : "";
+  return `<!doctype html><meta charset="utf-8"><style>
+    :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#101d23;color:#f5fafb;font:14px -apple-system,BlinkMacSystemFont,sans-serif;display:grid;place-items:center;height:100vh}
+    main{width:100%;padding:24px;display:grid;grid-template-columns:32px 1fr;gap:14px;align-items:center}.spinner{width:28px;height:28px;border:3px solid #37515b;border-top-color:#f5f7f8;border-radius:50%;animation:spin .8s linear infinite}h1{font-size:15px;margin:0 0 7px}p{color:#a9bbc1;margin:0;font-size:12px;line-height:1.5}.bar{height:5px;background:#263b44;border-radius:5px;overflow:hidden;margin-top:12px}.bar i{display:block;height:100%;background:#f0ad38;border-radius:5px;transition:width .2s}@keyframes spin{to{transform:rotate(360deg)}}</style>
+    <main><div class="spinner"></div><div><h1>${safe(message)}</h1><p>${safe(detail)}</p>${progress}</div></main>`;
+}
+
+function showUpdateProgress(message, detail = "", percent = null) {
+  if (!updateProgressWindow || updateProgressWindow.isDestroyed()) {
+    updateProgressWindow = new BrowserWindow({
+      width: 410,
+      height: 170,
+      title: "アップデート",
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      backgroundColor: "#101d23",
+      webPreferences: { contextIsolation: true, sandbox: true },
+    });
+    updateProgressWindow.setMenuBarVisibility(false);
+    updateProgressWindow.on("closed", () => {
+      updateProgressWindow = null;
+    });
+  }
+  updateProgressWindow.loadURL(
+    `data:text/html;charset=utf-8,${encodeURIComponent(updateProgressHtml(message, detail, percent))}`,
+  );
+  updateProgressWindow.show();
+  updateProgressWindow.focus();
+}
+
+function closeUpdateProgress() {
+  if (updateProgressWindow && !updateProgressWindow.isDestroyed())
+    updateProgressWindow.close();
+  updateProgressWindow = null;
+}
+
 function makeTray() {
-  tray = new Tray(appIcon.resize({ width: 22, height: 22 }));
+  tray = new Tray(trayIcon);
   tray.setToolTip("RAFT Vtuber");
   tray.setContextMenu(
     Menu.buildFromTemplate([
@@ -123,11 +192,23 @@ async function checkForUpdates(showResult = true) {
       });
     return;
   }
+  if (updateCheckInProgress) {
+    if (showResult)
+      showUpdateProgress("更新バージョンがあるか確認しています…", "そのままお待ちください。");
+    return;
+  }
   try {
+    updateCheckInProgress = true;
     manualUpdateCheck = showResult;
+    if (showResult)
+      showUpdateProgress("更新バージョンがあるか確認しています…", "そのままお待ちください。");
     await autoUpdater.checkForUpdates();
   } catch (error) {
-    if (showResult)
+    const shouldShowError = showResult && manualUpdateCheck;
+    updateCheckInProgress = false;
+    manualUpdateCheck = false;
+    closeUpdateProgress();
+    if (shouldShowError)
       await dialog.showMessageBox({
         type: "warning",
         message: "アップデートを確認できませんでした。",
@@ -213,27 +294,58 @@ session.defaultSession.setPermissionRequestHandler(
 session.defaultSession.setPermissionCheckHandler(
   (_webContents, permission) => permission === "media",
 );
-powerSaveBlocker.start("prevent-app-suspension");
-
 mainWindow = new BrowserWindow({
   ...windowOptions(),
   title: "RAFT Vtuber",
 });
 await mainWindow.loadURL(baseUrl);
-mainWindow.on("close", (event) => {
+mainWindow.on("close", async (event) => {
   if (quitting) return;
   event.preventDefault();
+  if (serverCloseQuestionOpen) return;
+  const activeTrackers = [...trackers.values()].filter(
+    (win) => win && !win.isDestroyed(),
+  );
+  if (activeTrackers.length === 0) {
+    mainWindow.hide();
+    return;
+  }
+  serverCloseQuestionOpen = true;
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: "question",
+    buttons: ["はい", "いいえ"],
+    defaultId: 1,
+    cancelId: 1,
+    message: "サーバーを閉じますか？",
+    detail:
+      "「はい」を選ぶと、起動中のメンバーカメラとサーバーを終了します。\n「いいえ」を選ぶと、サーバーを残してこのウインドウだけ閉じます。",
+    noLink: true,
+  });
+  serverCloseQuestionOpen = false;
+  if (result.response === 0) {
+    quitting = true;
+    app.quit();
+    return;
+  }
   mainWindow.hide();
 });
 mainWindow.webContents.on("will-navigate", (event, url) => {
   const target = new URL(url);
   if (
     target.origin !== baseUrl ||
-    target.searchParams.get("obs") === "1" ||
     !["/raft/", "/mai/", "/tanutsuna/", "/yansan/", "/muto/", "/moron/", "/week/"].includes(target.pathname)
   )
     return;
   event.preventDefault();
+  if (target.searchParams.get("obs") === "1") {
+    clipboard.writeText(url);
+    dialog.showMessageBox(mainWindow, {
+      type: "info",
+      message: "OBS用URLをコピーしました。",
+      detail: "OBSのブラウザソースへ貼り付けてください。ランチャーでは重いアバター描画を開きません。",
+    });
+    return;
+  }
   const trackerTitles = {
     "/raft/": "ラフト追従", "/mai/": "まい追従",
     "/tanutsuna/": "たぬつな追従", "/yansan/": "やんさん追従",
@@ -245,19 +357,38 @@ makeTray();
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 autoUpdater.on("update-not-available", async () => {
+  updateCheckInProgress = false;
   if (!manualUpdateCheck) return;
   manualUpdateCheck = false;
+  closeUpdateProgress();
   await dialog.showMessageBox(mainWindow, {
     type: "info",
     message: "現在のバージョンは最新版です。",
   });
 });
-autoUpdater.on("update-available", () => {
-  manualUpdateCheck = false;
+autoUpdater.on("update-available", (info) => {
+  if (manualUpdateCheck)
+    showUpdateProgress(
+      `バージョン ${info?.version || "最新版"} をダウンロードしています…`,
+      "完了するまでアプリを終了しないでください。",
+      0,
+    );
+});
+autoUpdater.on("download-progress", (progress) => {
+  if (!manualUpdateCheck) return;
+  const percent = Number(progress?.percent) || 0;
+  showUpdateProgress(
+    "アップデートをダウンロードしています…",
+    `${Math.round(percent)}% 完了`,
+    percent,
+  );
 });
 autoUpdater.on("error", async (error) => {
+  const shouldShowError = manualUpdateCheck;
+  updateCheckInProgress = false;
   manualUpdateCheck = false;
-  if (!mainWindow || mainWindow.isDestroyed()) return;
+  closeUpdateProgress();
+  if (!shouldShowError || !mainWindow || mainWindow.isDestroyed()) return;
   await dialog.showMessageBox(mainWindow, {
     type: "warning",
     message: "アップデート処理でエラーが発生しました。",
@@ -265,6 +396,9 @@ autoUpdater.on("error", async (error) => {
   });
 });
 autoUpdater.on("update-downloaded", async (event) => {
+  updateCheckInProgress = false;
+  manualUpdateCheck = false;
+  closeUpdateProgress();
   const result = await dialog.showMessageBox(mainWindow, {
     type: "info",
     buttons: ["今すぐ再起動して更新", "終了時に更新"],

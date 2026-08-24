@@ -1315,7 +1315,13 @@ function drawFacePartHighlight(g, id, x, y, now) {
     );
   g.restore();
 }
+let idleRenderedAt = -Infinity;
 function render(now) {
+  if (!running && !demo && !obs && now - idleRenderedAt < 100) {
+    requestAnimationFrame(render);
+    return;
+  }
+  idleRenderedAt = now;
   if (!running && !obs) track(now);
   if (demo) send(now);
   for (const k in target)
@@ -1413,6 +1419,9 @@ function render(now) {
   requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
+addEventListener("pagehide", () => {
+  if (running || stream) stop();
+}, { once: true });
 function previewFor(type, id) {
   const c = document.createElement("canvas");
   c.className = "asset-preview";
