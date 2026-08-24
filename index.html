@@ -1,8 +1,10 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>無残のラフト VTuberスタジオ</title><link rel="stylesheet" href="studio.css"></head><body class="launcher">
 <header><div><small>無残のラフト</small><h1>VTuberスタジオ</h1><p>1回の起動で、メンバーのカメラ画面とOBS表示をまとめて配信します。</p></div><span class="server"><i></i>サーバー起動中</span></header>
 <main><section class="members" id="members"></section><aside><h2>使い方</h2><ol><li>出演者の「カメラ」を開く</li><li>カメラを開始して追跡する</li><li>OBSへGBかBBのURLを追加</li></ol><p>OBSではソースの種類を「ブラウザ」にします。幅・高さは1000×1000がおすすめです。</p></aside></main>
+<small class="app-version" id="appVersion">バージョン確認中</small>
 <script>
 const data=[['1','ラフト',1,'raft'],['2','まい',1,'mai'],['3','たぬつな',1,'tanutsuna'],['4','やんさん',1,'yansan'],['5','ムート',1,'muto'],['6','もろん',1,'moron'],['7','ウィーク',1,'week']];
 const root=document.querySelector('#members');
 for(const [no,name,ready,slug] of data){const path=`/${slug}/`;const card=document.createElement('article');card.className=ready?'ready':'pending';card.innerHTML=`<b>No.${no}</b><h2>${name}</h2><span>${ready?'使用可能':'素材準備中'}</span><div>${ready?`<a href="${path}">カメラ</a><a href="${path}?obs=1&bg=transparent&member=${no}">OBS・透過</a><a href="${path}?obs=1&bg=green&member=${no}">OBS・GB</a><a href="${path}?obs=1&bg=blue&member=${no}">OBS・BB</a>`:'<button disabled>準備中</button>'}</div>`;root.append(card);}
+fetch('/version.json',{cache:'no-store'}).then(response=>response.json()).then(info=>{document.querySelector('#appVersion').textContent=`v${info.version}`}).catch(()=>{document.querySelector('#appVersion').textContent='バージョン不明'});
 </script></body></html>

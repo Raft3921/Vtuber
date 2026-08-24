@@ -25,6 +25,7 @@ let mainWindow,
   updateCheckInProgress = false,
   updateDownloadActive = false,
   updateOperationStartedAt = 0,
+  updateCheckStage = "開始前",
   serverCloseQuestionOpen = false,
   manualUpdateCheck = false,
   macUpdateOnQuit = null,
@@ -133,6 +134,7 @@ function showUpdateProgress(message, detail = "", percent = null, stage = -1, st
       updateProgressWindow = null;
     });
   }
+  updateProgressWindow.setSize(410, steps.length ? 270 : 190, true);
   updateProgressWindow.loadURL(
     `data:text/html;charset=utf-8,${encodeURIComponent(updateProgressHtml(message, detail, percent, stage, steps))}`,
   );
@@ -211,9 +213,87 @@ async function checkForUpdates(showResult = true) {
   try {
     updateCheckInProgress = true;
     manualUpdateCheck = showResult;
+    updateOperationStartedAt = Date.now();
+    const steps = [
+      "現在のバージョンを確認",
+      "GitHubへ接続",
+      "公開中のバージョンを比較",
+      "インストーラー情報を検証",
+    ];
     if (showResult)
-      showUpdateProgress("更新バージョンがあるか確認しています…", "そのままお待ちください。");
-    await autoUpdater.checkForUpdates();
+      showUpdateProgress(
+        "更新バージョンがあるか確認しています…",
+        `現在: ${app.getVersion()}`,
+        null,
+        0,
+        steps,
+      );
+    updateCheckStage = "GitHubへの接続";
+    if (showResult)
+      showUpdateProgress(
+        "GitHubへ接続しています…",
+        "通常は数秒で完了します。",
+        null,
+        1,
+        steps,
+      );
+    const metadataName = process.platform === "darwin" ? "latest-mac.yml" : "latest.yml",
+      metadataUrl = `https://github.com/Raft3921/Vtuber/releases/latest/download/${metadataName}`,
+      metadataResponse = await fetch(metadataUrl, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      });
+    if (!metadataResponse.ok)
+      throw new Error(`GitHubが更新情報を返しませんでした（HTTP ${metadataResponse.status}）`);
+    const metadata = await metadataResponse.text(),
+      publishedVersion = metadata.match(/^version:\s*["']?([^\s"']+)/m)?.[1];
+    if (!publishedVersion) throw new Error("公開中のバージョン番号を読み取れませんでした。");
+    updateCheckStage = "バージョンの比較";
+    if (showResult)
+      showUpdateProgress(
+        "公開中のバージョンを比較しています…",
+        `現在 ${app.getVersion()} ／ 公開 ${publishedVersion}`,
+        null,
+        2,
+        steps,
+      );
+    const normalizeVersion = (version) =>
+      String(version).replace(/^v/, "").split(".").map((part) => Number(part) || 0),
+      currentParts = normalizeVersion(app.getVersion()),
+      publishedParts = normalizeVersion(publishedVersion),
+      versionComparison = [0, 1, 2, 3].reduce(
+        (result, index) =>
+          result || Math.sign((publishedParts[index] || 0) - (currentParts[index] || 0)),
+        0,
+      ),
+      hasNewerVersion = versionComparison > 0;
+    if (!hasNewerVersion) {
+      updateCheckInProgress = false;
+      manualUpdateCheck = false;
+      closeUpdateProgress();
+      if (showResult)
+        await dialog.showMessageBox(mainWindow, {
+          type: "info",
+          message: "現在のバージョンは最新版です。",
+          detail: `現在: ${app.getVersion()}\n公開中: ${publishedVersion}\n確認時間: ${((Date.now() - updateOperationStartedAt) / 1000).toFixed(1)}秒\n確認日時: ${new Date().toLocaleString("ja-JP")}`,
+        });
+      return;
+    }
+    updateCheckStage = "インストーラー情報の検証";
+    if (showResult)
+      showUpdateProgress(
+        "インストーラー情報を検証しています…",
+        `新しいバージョン ${publishedVersion} が見つかりました。`,
+        null,
+        3,
+        steps,
+      );
+    await Promise.race([
+      autoUpdater.checkForUpdates(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("インストーラー情報の検証が30秒でタイムアウトしました。")), 30000),
+      ),
+    ]);
   } catch (error) {
     const shouldShowError = showResult && manualUpdateCheck;
     updateCheckInProgress = false;
@@ -223,7 +303,7 @@ async function checkForUpdates(showResult = true) {
       await dialog.showMessageBox({
         type: "warning",
         message: "アップデートを確認できませんでした。",
-        detail: String(error?.message || error),
+        detail: `停止した工程: ${updateCheckStage}\n経過時間: ${((Date.now() - updateOperationStartedAt) / 1000).toFixed(1)}秒\n\n${String(error?.message || error)}\n\n通信状態を確認して、もう一度「アップデートを確認」を押してください。`,
       });
   }
 }
@@ -234,7 +314,7 @@ function startMacUpdateInstaller(downloadedFile) {
   const executable = app.getPath("exe"),
     appBundle = dirname(dirname(dirname(executable))),
     logFile = join(app.getPath("userData"), "updater-install.log"),
-    script = String.raw`
+    script = `
 pid="$1"
 archive="$2"
 app_path="$3"
@@ -368,6 +448,7 @@ makeTray();
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 autoUpdater.on("update-not-available", async () => {
+  if (!updateCheckInProgress) return;
   updateCheckInProgress = false;
   if (!manualUpdateCheck) return;
   manualUpdateCheck = false;
@@ -379,6 +460,7 @@ autoUpdater.on("update-not-available", async () => {
   });
 });
 autoUpdater.on("update-available", async (info) => {
+  if (!updateCheckInProgress) return;
   updateCheckInProgress = false;
   closeUpdateProgress();
   const releaseNotes = Array.isArray(info?.releaseNotes)
@@ -402,6 +484,7 @@ autoUpdater.on("update-available", async (info) => {
   manualUpdateCheck = false;
   if (result.response !== 0) return;
   updateDownloadActive = true;
+  updateOperationStartedAt = Date.now();
   showUpdateProgress(
     `バージョン ${info?.version || "最新版"} をダウンロードしています…`,
     "完了するまでアプリを終了しないでください。",
