@@ -376,13 +376,14 @@ function pupilLayer(
   ctx.drawImage(img, -500 + gazeX, -500 + gazeY);
   ctx.restore();
 }
-let idleRenderedAt = -Infinity;
+let lastRenderedAt = -Infinity;
 function render(now) {
-  if (!running && !demo && !obsMode && now - idleRenderedAt < 100) {
+  const frameInterval = !running && !demo && !obsMode ? 100 : 1000 / 30;
+  if (now - lastRenderedAt < frameInterval) {
     requestAnimationFrame(render);
     return;
   }
-  idleRenderedAt = now;
+  lastRenderedAt = now;
   // カメラ追跡は映像フレーム側で継続。ここではテスト動作だけ生成する。
   if (!running) track(now);
   if (demo) sendPose(now);

@@ -23,6 +23,7 @@ let mainWindow,
   tray,
   updateProgressWindow,
   updateCheckInProgress = false,
+  updateDownloadActive = false,
   serverCloseQuestionOpen = false,
   manualUpdateCheck = false,
   macUpdateOnQuit = null,
@@ -33,13 +34,6 @@ const trackers = new Map();
 const appIcon = nativeImage.createFromPath(
   fileURLToPath(new URL("./members/icon/icon.png", import.meta.url)),
 );
-const trayIcon = nativeImage.createFromDataURL(
-  `data:image/svg+xml;base64,${Buffer.from(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-      <path fill="#000" d="M1.7 2.4h3.5L9 12.1l3.8-9.7h3.5L10.6 16H7.4z"/>
-    </svg>`).toString("base64")}`,
-);
-trayIcon.setTemplateImage(true);
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -147,7 +141,12 @@ function closeUpdateProgress() {
 }
 
 function makeTray() {
-  tray = new Tray(trayIcon);
+  tray = new Tray(
+    process.platform === "darwin"
+      ? nativeImage.createEmpty()
+      : appIcon.resize({ width: 22, height: 22 }),
+  );
+  if (process.platform === "darwin") tray.setTitle("V");
   tray.setToolTip("RAFT Vtuber");
   tray.setContextMenu(
     Menu.buildFromTemplate([
@@ -169,6 +168,7 @@ function makeTray() {
         click: () => openTracker("/week/", "ウィーク追従"),
       },
       { type: "separator" },
+      { label: `現在のバージョン ${app.getVersion()}`, enabled: false },
       { label: "アップデートを確認", click: checkForUpdates },
       { type: "separator" },
       {
@@ -192,9 +192,14 @@ async function checkForUpdates(showResult = true) {
       });
     return;
   }
-  if (updateCheckInProgress) {
+  if (updateCheckInProgress || updateDownloadActive) {
     if (showResult)
-      showUpdateProgress("更新バージョンがあるか確認しています…", "そのままお待ちください。");
+      showUpdateProgress(
+        updateDownloadActive
+          ? "アップデートをダウンロードしています…"
+          : "更新バージョンがあるか確認しています…",
+        "そのままお待ちください。",
+      );
     return;
   }
   try {
@@ -354,7 +359,7 @@ mainWindow.webContents.on("will-navigate", (event, url) => {
   openTracker(target.pathname, trackerTitles[target.pathname]);
 });
 makeTray();
-autoUpdater.autoDownload = true;
+autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 autoUpdater.on("update-not-available", async () => {
   updateCheckInProgress = false;
@@ -364,18 +369,53 @@ autoUpdater.on("update-not-available", async () => {
   await dialog.showMessageBox(mainWindow, {
     type: "info",
     message: "現在のバージョンは最新版です。",
+    detail: `バージョン ${app.getVersion()}\n確認日時: ${new Date().toLocaleString("ja-JP")}`,
   });
 });
-autoUpdater.on("update-available", (info) => {
-  if (manualUpdateCheck)
-    showUpdateProgress(
-      `バージョン ${info?.version || "最新版"} をダウンロードしています…`,
-      "完了するまでアプリを終了しないでください。",
-      0,
-    );
+autoUpdater.on("update-available", async (info) => {
+  updateCheckInProgress = false;
+  closeUpdateProgress();
+  const releaseNotes = Array.isArray(info?.releaseNotes)
+    ? info.releaseNotes
+        .map((entry) => entry?.note || entry?.version || "")
+        .filter(Boolean)
+        .join("\n")
+    : String(info?.releaseNotes || "更新内容はダウンロードページで確認できます。")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: "info",
+    buttons: ["ダウンロード", "後で"],
+    defaultId: 0,
+    cancelId: 1,
+    message: `新しいバージョン ${info?.version || ""} があります。`,
+    detail: `現在のバージョン: ${app.getVersion()}\n新しいバージョン: ${info?.version || "不明"}\n\n更新内容\n${releaseNotes || "更新内容はありません。"}`,
+    noLink: true,
+  });
+  manualUpdateCheck = false;
+  if (result.response !== 0) return;
+  updateDownloadActive = true;
+  showUpdateProgress(
+    `バージョン ${info?.version || "最新版"} をダウンロードしています…`,
+    "完了するまでアプリを終了しないでください。",
+    0,
+  );
+  try {
+    await autoUpdater.downloadUpdate();
+  } catch (error) {
+    if (!updateDownloadActive) return;
+    updateDownloadActive = false;
+    closeUpdateProgress();
+    await dialog.showMessageBox(mainWindow, {
+      type: "warning",
+      message: "アップデートをダウンロードできませんでした。",
+      detail: String(error?.message || error),
+    });
+  }
 });
 autoUpdater.on("download-progress", (progress) => {
-  if (!manualUpdateCheck) return;
+  if (!updateDownloadActive) return;
   const percent = Number(progress?.percent) || 0;
   showUpdateProgress(
     "アップデートをダウンロードしています…",
@@ -384,8 +424,9 @@ autoUpdater.on("download-progress", (progress) => {
   );
 });
 autoUpdater.on("error", async (error) => {
-  const shouldShowError = manualUpdateCheck;
+  const shouldShowError = manualUpdateCheck || updateDownloadActive;
   updateCheckInProgress = false;
+  updateDownloadActive = false;
   manualUpdateCheck = false;
   closeUpdateProgress();
   if (!shouldShowError || !mainWindow || mainWindow.isDestroyed()) return;
@@ -397,6 +438,7 @@ autoUpdater.on("error", async (error) => {
 });
 autoUpdater.on("update-downloaded", async (event) => {
   updateCheckInProgress = false;
+  updateDownloadActive = false;
   manualUpdateCheck = false;
   closeUpdateProgress();
   const result = await dialog.showMessageBox(mainWindow, {

@@ -1351,13 +1351,14 @@ function compositeCharacter() {
   }
   displayCtx.drawImage(characterCanvas, 0, 0);
 }
-let idleRenderedAt = -Infinity;
+let lastRenderedAt = -Infinity;
 function render(now) {
-  if (!running && !demo && !obs && now - idleRenderedAt < 100) {
+  const frameInterval = !running && !demo && !obs ? 100 : 1000 / 30;
+  if (now - lastRenderedAt < frameInterval) {
     requestAnimationFrame(render);
     return;
   }
-  idleRenderedAt = now;
+  lastRenderedAt = now;
   if (!running && !obs) track(now);
   if (demo) send(now);
   for (const k in target)
