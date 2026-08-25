@@ -9,6 +9,7 @@ import {
   appendLayoutSection,
   appendVisualSection,
 } from "../shared/settings-ui.js";
+import { drawFaceAccessory } from "../shared/accessory-hotkeys.js";
 
 const $ = (id) => document.getElementById(id),
   canvas = $("stage"),
@@ -1429,6 +1430,11 @@ function render(now) {
       mouthVisual.sx,
       mouthVisual.sy,
     );
+    drawFaceAccessory(ctx, {
+      centerX: 627 + x,
+      centerY: 627 + faceY,
+      rotation: pose.roll * 0.12,
+    });
   });
   outlinedLayer(() => {
     drawHairGroup("front", x, y, now);

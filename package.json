@@ -1,6 +1,6 @@
 {
   "name": "muzan-raft-vtuber-studio",
-  "version": "1.1.9",
+  "version": "1.1.10",
   "description": "Camera-tracked VTuber studio for OBS",
   "author": "Raft3921",
   "main": "bootstrap.cjs",
@@ -80,6 +80,10 @@
       "members/shared/cleaned/irises-v2.png",
       "members/shared/cleaned/mouth-speech-16-v3.png",
       "members/shared/cleaned/rig-atlas.png",
+      "members/shared/accessories/gaming-sunglasses-handdrawn-v2.png",
+      "members/shared/accessories/mask-white-handdrawn-v2.png",
+      "members/shared/accessories/mask-black-handdrawn-v2.png",
+      "members/shared/accessories/disguise-glasses-handdrawn-v2.png",
       "members/tanutsuna/parts/cleaned/base.png",
       "members/tanutsuna/parts/cleaned/hair.png",
       "members/tanutsuna/parts/rig-v3/hair-back-full-v3-dark-alpha.png",

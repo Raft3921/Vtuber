@@ -1,3 +1,5 @@
+import { drawFaceAccessory } from "../shared/accessory-hotkeys.js";
+
 const canvas = document.querySelector("#stage");
 const ctx = canvas.getContext("2d");
 const video = document.querySelector("#camera");
@@ -504,6 +506,18 @@ function render(now) {
     mouthScaleY,
     scale,
   );
+  drawFaceAccessory(ctx, {
+    centerX: 500 + headX,
+    centerY: 500 + headY,
+    rotation: headRot,
+    scale,
+    offsets: {
+      "gaming-sunglasses": 140,
+      "mask-white": 290,
+      "mask-black": 290,
+      "disguise-glasses": 175,
+    },
+  });
   ctx.restore();
   $("voiceMeter").value = pose.voice;
   $("voiceValue").value = `${Math.round(pose.voice * 100)}%`;
