@@ -50,11 +50,6 @@ document.documentElement.classList.toggle(
 );
 const files = [
     "base",
-    "hair",
-    "hair-front-v4",
-    "hair-upper-v4",
-    "hair-back-v5",
-    "hair-seam-cap-v6",
     "hair-back-generated-v14",
     "hair-upper-generated-v14",
     "hair-front-generated-v14",
@@ -163,10 +158,6 @@ async function loadRig(name) {
   c.getContext("2d").drawImage(img, 0, 0);
   return c;
 }
-const hairBackV3 = art["hair-back-v5"],
-  hairSeamCap = art["hair-seam-cap-v6"],
-  hairFrontV3 = art["hair-front-v4"],
-  hairUpperV1 = art["hair-upper-v4"];
 const hairPieceDefs = [
   {
     id: "back-main",
@@ -414,16 +405,6 @@ skinHighlight.width =
     c.drawImage(skinMask, 0, 0);
     c.globalCompositeOperation = "source-over";
   }
-}
-const hairStatic = crop(art.hair, 0, 0, 1254, 1254),
-  hairTipRegions = [
-    [300, 590, 245, 335],
-    [709, 590, 245, 335],
-  ],
-  hairTips = hairTipRegions.map((r) => crop(art.hair, ...r));
-{
-  const g = hairStatic.getContext("2d");
-  for (const r of hairTipRegions) g.clearRect(...r);
 }
 const assembledHair = [],
   hairSprings = [];

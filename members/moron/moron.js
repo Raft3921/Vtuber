@@ -50,7 +50,6 @@ document.documentElement.classList.toggle(
 );
 const files = [
     "base",
-    "hair",
     "hair-back-generated-v16",
     "hair-upper-generated-v17",
     "hair-front-generated-v16",
@@ -367,16 +366,6 @@ skinHighlight.width =
     c.drawImage(skinMask, 0, 0);
     c.globalCompositeOperation = "source-over";
   }
-}
-const hairStatic = crop(art.hair, 0, 0, 1254, 1254),
-  hairTipRegions = [
-    [300, 590, 245, 335],
-    [709, 590, 245, 335],
-  ],
-  hairTips = hairTipRegions.map((r) => crop(art.hair, ...r));
-{
-  const g = hairStatic.getContext("2d");
-  for (const r of hairTipRegions) g.clearRect(...r);
 }
 const assembledHair = [],
   hairSprings = [];

@@ -16,10 +16,6 @@
   ],
   "raft": [
     "members/raft/parts/cleaned/base.png",
-    "members/raft/parts/cleaned/hair.png",
-    "members/raft/parts/cleaned/hair-front-v4.png",
-    "members/raft/parts/cleaned/hair-upper-v4.png",
-    "members/raft/parts/cleaned/hair-back-v5.png",
     "members/raft/parts/cleaned/hair-seam-cap-v6.png",
     "members/raft/parts/cleaned/hair-back-1-v13.png",
     "members/raft/parts/cleaned/hair-back-2-v13.png",
@@ -33,11 +29,6 @@
   ],
   "mai": [
     "members/mai/parts/cleaned/base.png",
-    "members/mai/parts/cleaned/hair.png",
-    "members/mai/parts/cleaned/hair-front-v4.png",
-    "members/mai/parts/cleaned/hair-upper-v4.png",
-    "members/mai/parts/cleaned/hair-back-v5.png",
-    "members/mai/parts/cleaned/hair-seam-cap-v6.png",
     "members/mai/parts/cleaned/hair-back-generated-v14.png",
     "members/mai/parts/cleaned/hair-upper-generated-v14.png",
     "members/mai/parts/cleaned/hair-front-generated-v14.png",
@@ -45,13 +36,11 @@
   ],
   "tanutsuna": [
     "members/tanutsuna/parts/cleaned/base.png",
-    "members/tanutsuna/parts/cleaned/hair.png",
     "members/tanutsuna/parts/rig-v3/hair-back-full-v3-dark-alpha.png",
     "members/tanutsuna/parts/rig-v3/hair-front-assembled-v3-alpha.png"
   ],
   "yansan": [
     "members/yansan/parts/cleaned/base.png",
-    "members/yansan/parts/cleaned/hair.png",
     "members/yansan/parts/cleaned/hair-back-generated-v16.png",
     "members/yansan/parts/cleaned/hair-upper-generated-v16.png",
     "members/yansan/parts/cleaned/hair-front-generated-v16.png",
@@ -59,7 +48,6 @@
   ],
   "muto": [
     "members/muto/parts/cleaned/base.png",
-    "members/muto/parts/cleaned/hair.png",
     "members/muto/parts/cleaned/hair-back-generated-v16.png",
     "members/muto/parts/cleaned/hair-upper-generated-v16.png",
     "members/muto/parts/cleaned/hair-front-generated-v16.png",
@@ -68,7 +56,6 @@
   ],
   "moron": [
     "members/moron/parts/cleaned/base.png",
-    "members/moron/parts/cleaned/hair.png",
     "members/moron/parts/cleaned/hair-back-generated-v16.png",
     "members/moron/parts/cleaned/hair-upper-generated-v17.png",
     "members/moron/parts/cleaned/hair-front-generated-v16.png",
