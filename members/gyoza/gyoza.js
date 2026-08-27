@@ -197,6 +197,13 @@ const drawLayer = (name, alpha = 1) => { if (alpha <= 0) return; ctx.save(); ctx
 function around(x, y, rotation, scaleX, scaleY, draw) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(rotation); ctx.scale(scaleX, scaleY); ctx.translate(-x, -y); draw(); ctx.restore();
 }
+function drawShoulderConnector(side) {
+  // Keep only the supplied sleeve artwork nearest the torso; this fixed root hides rotation gaps.
+  ctx.save(); ctx.beginPath();
+  if(side==="left") ctx.ellipse(535,790,49,72,-.18,0,Math.PI*2);
+  else ctx.ellipse(719,790,49,72,.18,0,Math.PI*2);
+  ctx.clip(); drawLayer(`arm-${side}`); ctx.restore();
+}
 function advanceImageBaton(state, wanted, speed = .2, pinch = .7) {
   state.queued = wanted;
   if (state.p >= 1 && state.queued !== state.to) {
@@ -235,17 +242,19 @@ function drawCharacter(now) {
   ctx.save(); ctx.translate(627+x,680+y); ctx.rotate(pose.roll*.4); ctx.scale(scale*(1-Math.abs(yaw)*.04),scale*(1-pitch*.02)); ctx.translate(-627,-680);
   const bodyBob = Math.sin(now*.002)*2+bodySpring*.2;
   ctx.save(); ctx.translate(0,bodyBob);
-  const armLeftAngle=clamp(pose.armLeft,-1,1)*.48, armRightAngle=-clamp(pose.armRight,-1,1)*.48;
+  const armLeftAngle=clamp(pose.armLeft,-1,1)*.34, armRightAngle=-clamp(pose.armRight,-1,1)*.34;
   // Automatic silhouette shadow is derived from the supplied transparent PNGs.
   ctx.save(); ctx.filter=`drop-shadow(${-yaw*5}px ${7+Math.max(0,pitch)*3}px 4px rgba(45,22,16,.28))`;
   drawLayer("leg-left"); drawLayer("leg-right");
-  around(500,825,armLeftAngle,1,1,()=>{ drawLayer("hand-left"); drawLayer("arm-left"); });
-  around(754,825,armRightAngle,1,1,()=>{ drawLayer("hand-right"); drawLayer("arm-right"); });
+  drawShoulderConnector("left"); drawShoulderConnector("right");
+  around(535,790,armLeftAngle,1,1,()=>{ drawLayer("hand-left"); drawLayer("arm-left"); });
+  around(719,790,armRightAngle,1,1,()=>{ drawLayer("hand-right"); drawLayer("arm-right"); });
   drawLayer("body-torso"); ctx.restore();
   drawLayer("leg-left"); drawLayer("leg-right");
   // Shoulder pivots stay locked to the torso; each screen-side hand remains behind its sleeve.
-  around(500,825,armLeftAngle,1,1,()=>{ drawLayer("hand-left"); drawLayer("arm-left"); });
-  around(754,825,armRightAngle,1,1,()=>{ drawLayer("hand-right"); drawLayer("arm-right"); });
+  drawShoulderConnector("left"); drawShoulderConnector("right");
+  around(535,790,armLeftAngle,1,1,()=>{ drawLayer("hand-left"); drawLayer("arm-left"); });
+  around(719,790,armRightAngle,1,1,()=>{ drawLayer("hand-right"); drawLayer("arm-right"); });
   drawLayer("body-torso"); updateBodyShade(yaw,pitch); ctx.drawImage(bodyShadeCanvas,0,0);
   drawLayer("neck"); ctx.restore();
   const headShift = yaw*32;
