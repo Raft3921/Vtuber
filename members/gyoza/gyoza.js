@@ -16,9 +16,9 @@ $("openAdjuster").hidden = true;
 $("openMapper").hidden = false;
 document.querySelector("aside > p").textContent = "餃子の皮・3つの山・目餃子・口餃子を立体追跡";
 
-const target = { x: 0, y: 0, roll: 0, yaw: 0, pitch: 0, depth: 0, mouth: 0, eyeL: 1, eyeR: 1, gazeX: 0, gazeY: 0, smile: 0, brow: 0 };
+const target = { x: 0, y: 0, roll: 0, yaw: 0, pitch: 0, depth: 0, mouth: 0, eyeL: 1, eyeR: 1, gazeX: 0, gazeY: 0, smile: 0, brow: 0, armLeft: 0, armRight: 0 };
 const pose = { ...target };
-let running = false, demo = false, stream, landmarker, lastVideo = -1, lastSend = 0;
+let running = false, demo = false, stream, landmarker, poseLandmarker, lastVideo = -1, lastSend = 0;
 let pleatSpring = 0, pleatVelocity = 0, bodySpring = 0, bodyVelocity = 0;
 const eyeBatons = {
   left: { current: "eye-left-open", to: "eye-left-open", queued: "eye-left-open", p: 1 },
@@ -51,12 +51,13 @@ async function start() {
     const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/+esm");
     const files = await vision.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm");
     landmarker = await vision.FaceLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" }, runningMode: "VIDEO", numFaces: 1, minFaceDetectionConfidence: 0.45, minTrackingConfidence: 0.45, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true });
+    poseLandmarker = await vision.PoseLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate: "GPU" }, runningMode: "VIDEO", numPoses: 1, minPoseDetectionConfidence: .4, minPosePresenceConfidence: .4, minTrackingConfidence: .4 });
     running = true; demo = false; $("start").textContent = "停止"; status("追従中");
     video.requestVideoFrameCallback(frame);
     return true;
   } catch (error) { console.error(error); status("カメラを開始できません"); return false; }
 }
-function stop() { running = false; stream?.getTracks().forEach((track) => track.stop()); stream = null; landmarker?.close(); landmarker = null; $("start").textContent = "カメラを開始"; status("停止中"); }
+function stop() { running = false; stream?.getTracks().forEach((track) => track.stop()); stream = null; landmarker?.close(); poseLandmarker?.close(); landmarker = null; poseLandmarker = null; $("start").textContent = "カメラを開始"; status("停止中"); }
 function frame(now) { if (!running) return; track(now); send(now); video.requestVideoFrameCallback(frame); }
 function shapeMap(result) { return Object.fromEntries((result?.faceBlendshapes?.[0]?.categories || []).map((v) => [v.categoryName, v.score])); }
 function track(now) {
@@ -65,10 +66,19 @@ function track(now) {
     target.yaw = Math.sin(now * .00082) * .72; target.pitch = Math.sin(now * .00103) * .28; target.roll = Math.sin(now * .0013) * .14;
     target.depth = Math.sin(now * .0007) * .4; target.mouth = .5 + .5 * Math.sin(now * .0055);
     target.eyeL = target.eyeR = .12 + .88 * Math.abs(Math.sin(now * .00165)); target.gazeX = Math.sin(now * .002); target.gazeY = Math.sin(now * .0016);
-    target.smile = .5 + .5 * Math.sin(now * .0011 + 1); target.brow = .5 + .5 * Math.sin(now * .0014); return;
+    target.smile = .5 + .5 * Math.sin(now * .0011 + 1); target.brow = .5 + .5 * Math.sin(now * .0014);
+    target.armLeft=.15+.75*Math.sin(now*.00115); target.armRight=.15+.75*Math.sin(now*.00115+2.1); return;
   }
   if (!running || video.currentTime === lastVideo) return;
   lastVideo = video.currentTime;
+  const poseResult=poseLandmarker?.detectForVideo(video,now), body=poseResult?.landmarks?.[0];
+  if(body?.length>=17){
+    const torso=Math.max(.08,Math.hypot(body[11].x-body[12].x,body[11].y-body[12].y));
+    const lift=(shoulder,wrist)=>clamp((shoulder.y-wrist.y)/torso+.58,-1,1);
+    // Naming is screen-relative: camera-right biological arm drives the screen-left artwork.
+    if((body[12].visibility??1)>.35&&(body[16].visibility??1)>.35) target.armLeft=lift(body[12],body[16]);
+    if((body[11].visibility??1)>.35&&(body[15].visibility??1)>.35) target.armRight=lift(body[11],body[15]);
+  } else { target.armLeft*=.92; target.armRight*=.92; }
   const result = landmarker?.detectForVideo(video, now), lm = result?.faceLandmarks?.[0];
   if (!lm) { status("顔を探しています…"); return; }
   status("追従中");
@@ -106,6 +116,16 @@ const assetNames = [
 const art = Object.fromEntries(await Promise.all(assetNames.map(async (name) => {
   const image = new Image(); image.src = `parts/${name}.png`; await image.decode(); return [name, image];
 })));
+const bodyShadeCanvas=document.createElement("canvas"), bodyShadeCtx=bodyShadeCanvas.getContext("2d");
+bodyShadeCanvas.width=bodyShadeCanvas.height=1254;
+function updateBodyShade(yaw,pitch){
+  const g=bodyShadeCtx; g.clearRect(0,0,1254,1254); g.globalCompositeOperation="source-over";
+  g.drawImage(art["body-torso"],0,0,1254,1254); g.globalCompositeOperation="source-in";
+  const from=yaw>=0?430:824,to=yaw>=0?830:424,gradient=g.createLinearGradient(from,760,to,1080);
+  gradient.addColorStop(0,"rgba(63,28,17,0)"); gradient.addColorStop(.58,"rgba(63,28,17,.025)");
+  gradient.addColorStop(.72,"rgba(63,28,17,.12)"); gradient.addColorStop(1,`rgba(49,22,14,${.2+Math.abs(yaw)*.1+Math.max(0,pitch)*.05})`);
+  g.fillStyle=gradient; g.fillRect(0,0,1254,1254); g.globalCompositeOperation="source-over";
+}
 const expressionAssets = {
   eye: ["open", "half", "closed", "smile"],
   brow: ["raised", "relaxed", "frown"],
@@ -215,11 +235,19 @@ function drawCharacter(now) {
   ctx.save(); ctx.translate(627+x,680+y); ctx.rotate(pose.roll*.4); ctx.scale(scale*(1-Math.abs(yaw)*.04),scale*(1-pitch*.02)); ctx.translate(-627,-680);
   const bodyBob = Math.sin(now*.002)*2+bodySpring*.2;
   ctx.save(); ctx.translate(0,bodyBob);
+  const armLeftAngle=clamp(pose.armLeft,-1,1)*.48, armRightAngle=-clamp(pose.armRight,-1,1)*.48;
+  // Automatic silhouette shadow is derived from the supplied transparent PNGs.
+  ctx.save(); ctx.filter=`drop-shadow(${-yaw*5}px ${7+Math.max(0,pitch)*3}px 4px rgba(45,22,16,.28))`;
   drawLayer("leg-left"); drawLayer("leg-right");
-  // The supplied parts are already aligned. Hands stay behind sleeves, and shoulders remain locked to the torso.
-  drawLayer("hand-left"); drawLayer("hand-right");
-  drawLayer("arm-left"); drawLayer("arm-right");
-  drawLayer("body-torso"); drawLayer("neck"); ctx.restore();
+  around(500,825,armLeftAngle,1,1,()=>{ drawLayer("hand-left"); drawLayer("arm-left"); });
+  around(754,825,armRightAngle,1,1,()=>{ drawLayer("hand-right"); drawLayer("arm-right"); });
+  drawLayer("body-torso"); ctx.restore();
+  drawLayer("leg-left"); drawLayer("leg-right");
+  // Shoulder pivots stay locked to the torso; each screen-side hand remains behind its sleeve.
+  around(500,825,armLeftAngle,1,1,()=>{ drawLayer("hand-left"); drawLayer("arm-left"); });
+  around(754,825,armRightAngle,1,1,()=>{ drawLayer("hand-right"); drawLayer("arm-right"); });
+  drawLayer("body-torso"); updateBodyShade(yaw,pitch); ctx.drawImage(bodyShadeCanvas,0,0);
+  drawLayer("neck"); ctx.restore();
   const headShift = yaw*32;
   ctx.save(); ctx.translate(headShift,pitch*9);
   drawLayer("head-base");
@@ -289,7 +317,7 @@ $("importJson").onchange=async(event)=>{ try { const raw=JSON.parse(await event.
 addEventListener("keydown",(event)=>{ if(event.key==="F8"){ event.preventDefault(); const hidden=!$("exportAll").hidden; $("exportAll").hidden=hidden; $("exportJson").hidden=hidden; } });
 let last = -Infinity;
 function render(now) {
-  if (now-last > (document.hidden ? 100 : 0)) { last=now; if (!running && !obs) track(now); if (demo) send(now); for (const key in pose) pose[key] += (target[key]-pose[key]) * (key.startsWith("eye")||key==="mouth" ? .38 : key==="smile"||key==="brow" ? .24 : key.startsWith("gaze") ? .28 : .12); drawCharacter(now); $("mouthValue").textContent=`${Math.round(pose.mouth*100)}%`; $("gazeValue").textContent=pose.gazeX.toFixed(2); $("eyeValue").textContent=`${Math.round((pose.eyeL+pose.eyeR)*50)}%`; }
+  if (now-last > (document.hidden ? 100 : 0)) { last=now; if (!running && !obs) track(now); if (demo) send(now); for (const key in pose) pose[key] += (target[key]-pose[key]) * (key.startsWith("eye")||key==="mouth" ? .38 : key.startsWith("arm") ? .18 : key==="smile"||key==="brow" ? .24 : key.startsWith("gaze") ? .28 : .12); drawCharacter(now); $("mouthValue").textContent=`${Math.round(pose.mouth*100)}%`; $("gazeValue").textContent=pose.gazeX.toFixed(2); $("eyeValue").textContent=`${Math.round((pose.eyeL+pose.eyeR)*50)}%`; }
   requestAnimationFrame(render);
 }
 requestAnimationFrame(render);

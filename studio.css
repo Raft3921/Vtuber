@@ -100,6 +100,7 @@ body.launcher { min-height: 100vh; }
 .member-shortcut:nth-child(5) { color: #15171b; background: #7f8792; }
 .member-shortcut:nth-child(6) { color: #fff; background: #914fbd; }
 .member-shortcut:nth-child(7) { color: #15171b; background: #e4b91f; }
+.member-shortcut:nth-child(8) { color: #fff; background: #8a4726; }
 .member-shortcut:hover { color: inherit; background: inherit; filter: brightness(1.12); }
 .rail-spacer { flex: 1; }
 
@@ -226,6 +227,7 @@ article:nth-child(4) { --member-color: #f07824; }
 article:nth-child(5) { --member-color: #7f8792; }
 article:nth-child(6) { --member-color: #914fbd; }
 article:nth-child(7) { --member-color: #e4b91f; }
+article:nth-child(8) { --member-color: #8a4726; }
 .member-meta { align-self: center; min-width: 0; }
 .member-meta small { color: var(--subtle); font-size: 8px; font-weight: 800; letter-spacing: .12em; }
 .member-meta h3 { overflow: hidden; margin: 2px 0 0; font-size: 18px; text-overflow: ellipsis; white-space: nowrap; }
