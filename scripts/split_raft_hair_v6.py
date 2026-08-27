@@ -2,10 +2,21 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "members/raft/parts/cleaned/hair-master-v5.png"
 OUT = ROOT / "members/raft/parts/cleaned"
+SOURCE = OUT / "hair-master-v5.png"
 
-src = Image.open(SOURCE).convert("RGBA")
+has_master = SOURCE.exists()
+if has_master:
+    src = Image.open(SOURCE).convert("RGBA")
+else:
+    # The distributed studio keeps the current split locks, not the old master.
+    # Reconstruct their union so the internal seam can always be restored.
+    parts = sorted(OUT.glob("hair-*-*-v13.png"))
+    if not parts:
+        raise FileNotFoundError("No Raft hair source or split locks were found")
+    src = Image.new("RGBA", Image.open(parts[0]).size, (0, 0, 0, 0))
+    for part in parts:
+        src.alpha_composite(Image.open(part).convert("RGBA"))
 alpha = src.getchannel("A")
 w, h = src.size
 
@@ -18,18 +29,19 @@ groups = {
     "front": lambda x, y: 350 <= y <= 700,
 }
 
-for group, accepts in groups.items():
-    for index, (x0, x1) in enumerate(x_ranges, 1):
-        mask = Image.new("L", (w, h), 0)
-        pixels = mask.load()
-        source_alpha = alpha.load()
-        for y in range(h):
-            for x in range(max(0, x0), min(w, x1)):
-                if source_alpha[x, y] and accepts(x, y):
-                    pixels[x, y] = source_alpha[x, y]
-        piece = src.copy()
-        piece.putalpha(mask)
-        piece.save(OUT / f"hair-{group}-{index}-v6.png", optimize=True)
+if has_master:
+    for group, accepts in groups.items():
+        for index, (x0, x1) in enumerate(x_ranges, 1):
+            mask = Image.new("L", (w, h), 0)
+            pixels = mask.load()
+            source_alpha = alpha.load()
+            for y in range(h):
+                for x in range(max(0, x0), min(w, x1)):
+                    if source_alpha[x, y] and accepts(x, y):
+                        pixels[x, y] = source_alpha[x, y]
+            piece = src.copy()
+            piece.putalpha(mask)
+            piece.save(OUT / f"hair-{group}-{index}-v6.png", optimize=True)
 
 # Narrow internal cover drawn above the face but below all moving locks.
 # It only occupies the group boundary, avoiding a second visible hairstyle.

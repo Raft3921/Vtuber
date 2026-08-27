@@ -41,6 +41,7 @@ const trackerTitles = {
   "/muto/": "ムート追従",
   "/moron/": "もろん追従",
   "/week/": "ウィーク追従",
+  "/gyoza/": "ギョーザ追従",
 };
 const appIcon = nativeImage.createFromPath(
   fileURLToPath(new URL("./members/icon/icon.png", import.meta.url)),
@@ -106,6 +107,10 @@ function openTracker(pathname, title) {
     return win;
   }
   win = new BrowserWindow({ ...windowOptions(1120, 800, true), title });
+  win.webContents.on("console-message", (details) => {
+    if (details.level === "error")
+      console.error(`[${pathname}] ${details.message} (${details.sourceId}:${details.lineNumber})`);
+  });
   trackers.set(pathname, win);
   updatePowerSaveBlocker();
   win.loadURL(`${baseUrl}${pathname}?desktop=1`);
@@ -129,6 +134,10 @@ async function createMainWindow() {
   const win = new BrowserWindow({
     ...windowOptions(),
     title: "RAFT Vtuber",
+  });
+  win.webContents.on("console-message", (details) => {
+    if (details.level === "error")
+      console.error(`[studio] ${details.message} (${details.sourceId}:${details.lineNumber})`);
   });
   mainWindow = win;
   win.on("closed", () => {
@@ -264,6 +273,10 @@ function makeTray() {
       {
         label: "No.7 ウィーク追従を開く",
         click: () => openTracker("/week/", "ウィーク追従"),
+      },
+      {
+        label: "No.8 ギョーザ追従を開く",
+        click: () => openTracker("/gyoza/", "ギョーザ追従"),
       },
       { type: "separator" },
       { label: `現在のバージョン ${app.getVersion()}`, enabled: false },
@@ -450,13 +463,30 @@ app.on("second-instance", showMain);
 
 await app.whenReady();
 process.env.VTUBER_CONFIG_ROOT = join(app.getPath("userData"), "config");
-try {
-  const response = await fetch(baseUrl);
-  const body = response.ok ? await response.text() : "";
-  if (!body.includes("VTuberスタジオ")) throw new Error("unexpected server");
-} catch {
+let embeddedServerStarted = false,
+  serverRecoveryInProgress = false;
+async function localStudioIsAvailable() {
   try {
-    await import("./server.mjs");
+    const response = await fetch(baseUrl, { signal: AbortSignal.timeout(1500) });
+    const body = response.ok ? await response.text() : "";
+    return body.includes("VTuberスタジオ");
+  } catch {
+    return false;
+  }
+}
+async function ensureLocalStudioServer() {
+  if (serverRecoveryInProgress || (await localStudioIsAvailable())) return;
+  serverRecoveryInProgress = true;
+  try {
+    if (!embeddedServerStarted) {
+      await import("./server.mjs");
+      embeddedServerStarted = true;
+    }
+    for (const tracker of trackers.values()) {
+      if (tracker && !tracker.isDestroyed()) tracker.webContents.reloadIgnoringCache();
+    }
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.reloadIgnoringCache();
   } catch (error) {
     await dialog.showMessageBox({
       type: "error",
@@ -465,8 +495,14 @@ try {
     });
     app.quit();
     process.exit(1);
+  } finally {
+    serverRecoveryInProgress = false;
   }
 }
+await ensureLocalStudioServer();
+// An external development server may disappear while the desktop app remains open.
+// Recover with the bundled server so every member page becomes available again.
+setInterval(ensureLocalStudioServer, 2000).unref();
 session.defaultSession.setPermissionRequestHandler(
   (_webContents, permission, callback) => {
     callback(permission === "media");
