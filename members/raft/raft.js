@@ -50,7 +50,6 @@ document.documentElement.classList.toggle(
 );
 const files = [
     "base",
-    "hair-seam-cap-v6",
     "hair-back-1-v13",
     "hair-back-2-v13",
     "hair-back-3-v13",
@@ -124,7 +123,6 @@ async function loadRig(name) {
   c.getContext("2d").drawImage(img, 0, 0);
   return c;
 }
-const hairSeamCap = art["hair-seam-cap-v6"];
 const hairPieceDefs = [
   {
     id: "back-left",
@@ -1171,9 +1169,6 @@ function drawHairGroup(group, x, y, now, hit = false) {
 function drawBackHair(x, y, now) {
   drawHairGroup("back", x, y, now);
 }
-function drawHairSeam(x, y) {
-  ctx.drawImage(hairSeamCap, x + 38, y);
-}
 function drawHairCrown() {}
 function advanceBaton(state, wanted) {
   if (wanted !== state.to) {
@@ -1432,7 +1427,6 @@ function render(now) {
     });
   });
   outlinedLayer(() => {
-    drawHairSeam(x, y);
     drawHairGroup("upper", x, y, now);
     drawHairGroup("front", x, y, now);
   });

@@ -1,6 +1,6 @@
 {
   "name": "muzan-raft-vtuber-studio",
-  "version": "1.1.17",
+  "version": "1.1.18",
   "description": "Camera-tracked VTuber studio for OBS",
   "author": "Raft3921",
   "main": "bootstrap.cjs",
@@ -59,7 +59,6 @@
       "members/raft/parts/cleaned/hair-front-1-v13.png",
       "members/raft/parts/cleaned/hair-front-2-v13.png",
       "members/raft/parts/cleaned/hair-front-3-v13.png",
-      "members/raft/parts/cleaned/hair-seam-cap-v6.png",
       "members/raft/parts/cleaned/hair-upper-1-v13.png",
       "members/raft/parts/cleaned/hair-upper-2-v13.png",
       "members/raft/parts/cleaned/hair-upper-3-v13.png",
