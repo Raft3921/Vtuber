@@ -89,6 +89,31 @@ code {
   color: #d7e7eb;
   word-break: break-all;
 }
+#obsLinks {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+.obs-copy-row {
+  display: grid;
+  place-items: stretch;
+  gap: 6px;
+  padding: 10px;
+  background: #17282f;
+  border-radius: 10px;
+}
+.obs-copy-row strong {
+  color: #edf5f7;
+  font-size: 12px;
+}
+.obs-copy-row code {
+  font-size: 9px;
+}
+.obs-copy-row button {
+  margin: 2px 0 0;
+  padding: 8px;
+  background: #385663;
+}
 #status {
   position: absolute;
   left: 15px;

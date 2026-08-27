@@ -29,7 +29,8 @@ document.querySelector("#memberName").textContent =
   `No.${avatar.number} ${avatar.name}`;
 
 const base = `http://127.0.0.1:8777/${slug}/?obs=1&member=${avatar.member}`;
-document.querySelector("#obsLinks").innerHTML = [
+const obsLinks = document.querySelector("#obsLinks");
+obsLinks.innerHTML = [
   ["OBS 透過（推奨）", `${base}&bg=transparent`],
   [
     avatar.greenClothes ? "OBS GB（緑の服には非推奨）" : "OBS GB",
@@ -37,7 +38,35 @@ document.querySelector("#obsLinks").innerHTML = [
   ],
   ["OBS BB", `${base}&bg=blue`],
 ]
-  .map(([label, url]) => `${label}<br><code>${url}</code>`)
-  .join("<br><br>");
+  .map(
+    ([label, url]) => `<section class="obs-copy-row">
+      <strong>${label}</strong>
+      <code>${url}</code>
+      <button type="button" data-obs-url="${url}">URLをコピー</button>
+    </section>`,
+  )
+  .join("");
+
+async function copyObsUrl(button) {
+  const url = button.dataset.obsUrl;
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = url;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+  button.textContent = "コピーしました";
+  setTimeout(() => (button.textContent = "URLをコピー"), 1800);
+}
+obsLinks.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-obs-url]");
+  if (button) copyObsUrl(button);
+});
 
 await import(avatar.module);
