@@ -15,6 +15,7 @@ const memberConfigFiles = {
   "4": "yansan-all-settings.json",
   "5": "muto-all-settings.json",
   "6": "moron-all-settings.json",
+  "8": "gyoza-all-settings.json",
 };
 const configFileForMember = (member) =>
   memberConfigFiles[member] || `member-${member}-all-settings.json`;

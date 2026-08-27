@@ -16,6 +16,7 @@ const avatars = {
   yansan: { member: "4", number: 4, name: "やんさん", module: "/yansan/yansan.js" },
   muto: { member: "5", number: 5, name: "ムート", module: "/muto/muto.js" },
   moron: { member: "6", number: 6, name: "もろん", module: "/moron/moron.js" },
+  gyoza: { member: "8", number: 8, name: "ギョーザ", module: "/gyoza/gyoza.js" },
 };
 
 const slug = location.pathname.split("/").filter(Boolean)[0],
