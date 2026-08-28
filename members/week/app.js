@@ -380,7 +380,7 @@ function pupilLayer(
 }
 let lastRenderedAt = -Infinity;
 function render(now) {
-  const frameInterval = document.hidden || (!running && !demo && !obsMode) ? 100 : 0;
+  const frameInterval = document.hidden ? 100 : obsMode ? 1000 / 30 : running || demo ? 1000 / 45 : 100;
   if (now - lastRenderedAt < frameInterval) {
     requestAnimationFrame(render);
     return;

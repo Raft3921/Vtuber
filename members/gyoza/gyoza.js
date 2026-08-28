@@ -21,7 +21,7 @@ const target = {
   x: 0, y: 0, roll: 0, yaw: 0, pitch: 0, depth: 0,
   mouth: 0, eyeL: 1, eyeR: 1,
   gazeX: 0, gazeY: 0, gazeLX: 0, gazeLY: 0, gazeRX: 0, gazeRY: 0,
-  smile: 0, brow: 0,
+  smile: 0, brow: 0, browL: 0, browR: 0,
   armLeft: 0, armRight: 0, elbowLeft: 0, elbowRight: 0,
 };
 const pose = { ...target };
@@ -79,7 +79,8 @@ function track(now) {
     target.gazeLX = Math.sin(now * .002); target.gazeLY = Math.sin(now * .0016);
     target.gazeRX = Math.sin(now * .002 + .14); target.gazeRY = Math.sin(now * .0016 + .1);
     target.gazeX = (target.gazeLX + target.gazeRX) / 2; target.gazeY = (target.gazeLY + target.gazeRY) / 2;
-    target.smile = .5 + .5 * Math.sin(now * .0011 + 1); target.brow = .5 + .5 * Math.sin(now * .0014);
+    target.smile = .5 + .5 * Math.sin(now * .0011 + 1);
+    target.browL=.8*Math.sin(now*.0014); target.browR=.8*Math.sin(now*.0014+.55); target.brow=(target.browL+target.browR)/2;
     target.armLeft=.15+.75*Math.sin(now*.00115); target.armRight=.15+.75*Math.sin(now*.00115+2.1);
     target.elbowLeft=.72*Math.sin(now*.0017+.4); target.elbowRight=.72*Math.sin(now*.00155+2.4); return;
   }
@@ -106,11 +107,13 @@ function track(now) {
   if (!lm) { status("顔を探しています…"); return; }
   status("追従中");
   const s = shapeMap(result), avg = (a, b) => ((s[a] || 0) + (s[b] || 0)) / 2;
-  target.eyeL = clamp(1 - (s.eyeBlinkLeft || 0) * 1.3);
-  target.eyeR = clamp(1 - (s.eyeBlinkRight || 0) * 1.3);
-  target.mouth = clamp((s.jawOpen || 0) * 1.12 + (s.mouthFunnel || 0) * .52 + (s.mouthPucker || 0) * .22);
-  target.smile = clamp(avg("mouthSmileLeft", "mouthSmileRight") * 1.75);
-  target.brow = clamp((s.browInnerUp || 0) * 1.55 - avg("browDownLeft", "browDownRight") * 1.25, -.9, 1);
+  target.eyeL = clamp(1 - (s.eyeBlinkLeft || 0) * 1.65);
+  target.eyeR = clamp(1 - (s.eyeBlinkRight || 0) * 1.65);
+  target.mouth = clamp((s.jawOpen || 0) * 1.42 + (s.mouthFunnel || 0) * .62 + (s.mouthPucker || 0) * .34);
+  target.smile = clamp(avg("mouthSmileLeft", "mouthSmileRight") * 2.05 + avg("cheekSquintLeft", "cheekSquintRight") * .28);
+  target.browL=clamp((s.browOuterUpLeft||0)*1.45+(s.browInnerUp||0)*1.15-(s.browDownLeft||0)*1.7,-1,1);
+  target.browR=clamp((s.browOuterUpRight||0)*1.45+(s.browInnerUp||0)*1.15-(s.browDownRight||0)*1.7,-1,1);
+  target.brow=(target.browL+target.browR)/2;
   const left = lm[234], right = lm[454], top = lm[10], chin = lm[152], nose = lm[1];
   const fw = Math.max(.001, Math.hypot(right.x - left.x, right.y - left.y));
   const fh = Math.max(.001, Math.hypot(chin.x - top.x, chin.y - top.y));
@@ -274,26 +277,28 @@ function advanceImageBaton(state, wanted, speed = .2, pinch = .7) {
     : { name: state.to, sx: 1.06+(1-1.06)*ease, sy: pinch+(1-pinch)*ease };
 }
 function wantedEye(side, openness, smile) {
-  const fallback = smile>.42 ? 3 : openness<.24 ? 2 : openness<.66 ? 1 : 0;
+  const fallback = smile>.32 ? 3 : openness<.3 ? 2 : openness<.72 ? 1 : 0;
   return `eye-${side}-${expressionAssets.eye[nearestProfile("eye",fallback)]}`;
 }
 function drawEye(side, openness, smile, yaw) {
   const x = side === "left" ? 446 : 808, y = 555;
   const far = side === "left" ? yaw > 0 : yaw < 0;
-  const visual = advanceImageBaton(eyeBatons[side], wantedEye(side, openness, smile), .24, .66);
+  const visual = advanceImageBaton(eyeBatons[side], wantedEye(side, openness, smile), .3, .7);
   around(x, y, side === "left" ? pleatSpring*.004 : -pleatSpring*.004, far ? 1-Math.abs(yaw)*.12 : 1, 1, () => {
     around(x,y,0,visual.sx,visual.sy,()=>drawLayer(visual.name));
   });
 }
 function drawBentArm(side, shoulderAngle, elbowAmount) {
-  const left=side==="left", shoulderX=left?535:719, shoulderY=790;
-  const wristX=left?382:872, wristY=887;
+  const left=side==="left", shoulderX=left?552:702, shoulderY=748;
+  const wristX=left?467:787, wristY=854;
   const bend=clamp(elbowAmount,-1,1);
   const armName=`arm-${side}`, handName=`hand-${side}`;
   // Each supplied sleeve is one continuous drawing. Render it once only; use
   // elbow tracking as a soft shoulder rotation/squash and articulate the hand.
-  around(shoulderX,shoulderY,shoulderAngle+bend*(left?-.09:.09),1,1-Math.abs(bend)*.035,()=>{
-    around(wristX,wristY,bend*(left?-.22:.22),1,1,()=>drawLayer(handName));
+  around(shoulderX,shoulderY,shoulderAngle+bend*(left?-.075:.075),1,1-Math.abs(bend)*.025,()=>{
+    ctx.save(); ctx.translate(left?7:-7,2);
+    around(wristX,wristY,bend*(left?-.18:.18),.88,.88,()=>drawLayer(handName));
+    ctx.restore();
     drawLayer(armName);
   });
 }
@@ -326,10 +331,10 @@ function drawCharacter(now) {
   ctx.save(); if (yaw>0) { ctx.translate(1254,0); ctx.scale(-1,1); } drawLayer("head-shadow-left", .18+Math.abs(yaw)*.56); ctx.restore();
   drawLayer("head-highlight", .42);
   const browFallback=pose.brow>.3?0:pose.brow<-.16?2:1, browIndex=nearestProfile("brow",browFallback), browShape=[-.055,0,.06][browIndex];
-  around(485,380,browShape+pleatSpring*.012,1,1,()=>drawLayer("head-crease-left"));
-  around(769,380,-browShape-pleatSpring*.012,1,1,()=>drawLayer("head-crease-right"));
+  ctx.save(); ctx.translate(0,-pose.browL*11); around(485,380,browShape-pose.browL*.07+pleatSpring*.012,1,1+Math.abs(pose.browL)*.025,()=>drawLayer("head-crease-left")); ctx.restore();
+  ctx.save(); ctx.translate(0,-pose.browR*11); around(769,380,-browShape+pose.browR*.07-pleatSpring*.012,1,1+Math.abs(pose.browR)*.025,()=>drawLayer("head-crease-right")); ctx.restore();
   ctx.save(); ctx.translate(yaw*7,pitch*4); ctx.save(); ctx.translate(pose.gazeLX*7,pose.gazeLY*5); drawEye("left",pose.eyeL,pose.smile,yaw); ctx.restore(); ctx.save(); ctx.translate(pose.gazeRX*7,pose.gazeRY*5); drawEye("right",pose.eyeR,pose.smile,yaw); ctx.restore(); ctx.restore();
-  const mouthVisual = advanceImageBaton(mouthBaton,mouthName(),.22,.7);
+  const mouthVisual = advanceImageBaton(mouthBaton,mouthName(),.29,.74);
   ctx.save(); ctx.translate(yaw*12,pitch*7+pose.mouth*2); around(627,710,pose.roll*.025,mouthVisual.sx,mouthVisual.sy,()=>drawLayer(mouthVisual.name)); ctx.restore();
   drawFaceAccessory(ctx,{centerX:627,centerY:590,rotation:pose.roll*.18});
   ctx.restore(); ctx.restore();
@@ -390,7 +395,7 @@ addEventListener("keydown",(event)=>{ if(event.key==="F8"){ event.preventDefault
 let last = -Infinity;
 function render(now) {
   const frameInterval=document.hidden?100:obs?1000/30:running?1000/45:1000/30;
-  if (now-last > frameInterval) { last=now; if (!running && !obs) track(now); if (demo) send(now); for (const key in pose) pose[key] += (target[key]-pose[key]) * (key.startsWith("eye")||key==="mouth" ? .38 : key.startsWith("arm") ? .18 : key==="smile"||key==="brow" ? .24 : key.startsWith("gaze") ? .28 : .12); drawCharacter(now); $("mouthValue").textContent=`${Math.round(pose.mouth*100)}%`; $("gazeValue").textContent=pose.gazeX.toFixed(2); $("eyeValue").textContent=`${Math.round((pose.eyeL+pose.eyeR)*50)}%`; }
+  if (now-last > frameInterval) { last=now; if (!running && !obs) track(now); if (demo) send(now); for (const key in pose) pose[key] += (target[key]-pose[key]) * (key.startsWith("eye")||key==="mouth" ? .38 : key.startsWith("arm") ? .18 : key==="smile"||key.startsWith("brow") ? .24 : key.startsWith("gaze") ? .28 : .12); drawCharacter(now); $("mouthValue").textContent=`${Math.round(pose.mouth*100)}%`; $("gazeValue").textContent=pose.gazeX.toFixed(2); $("eyeValue").textContent=`${Math.round((pose.eyeL+pose.eyeR)*50)}%`; }
   requestAnimationFrame(render);
 }
 requestAnimationFrame(render);

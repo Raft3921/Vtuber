@@ -1339,7 +1339,7 @@ function compositeCharacter() {
 }
 let lastRenderedAt = -Infinity;
 function render(now) {
-  const frameInterval = document.hidden || (!running && !demo && !obs) ? 100 : 0;
+  const frameInterval = document.hidden ? 100 : obs ? 1000 / 30 : running || demo ? 1000 / 45 : 100;
   if (now - lastRenderedAt < frameInterval) {
     requestAnimationFrame(render);
     return;
