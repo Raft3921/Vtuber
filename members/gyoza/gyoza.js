@@ -119,13 +119,19 @@ async function loadArt(name) {
   image.src = `parts/${name}.png?v=${encodeURIComponent(assetRevision)}`;
   try {
     await image.decode();
-    return [name, image];
+    const layer = document.createElement("canvas");
+    layer.width = layer.height = 1254;
+    layer.getContext("2d").drawImage(image, 0, 0, 1254, 1254);
+    return layer;
   } catch (error) {
     console.error(`ギョーザ素材を読み込めませんでした: ${name}`, error);
-    return [name, null];
+    return null;
   }
 }
-const art = Object.fromEntries(await Promise.all(assetNames.map(loadArt)));
+// OBS Chromium is memory-sensitive. Match the other characters by decoding one
+// layer at a time, and keep only the canvas-sized copy used by this studio.
+const art = {};
+for (const name of assetNames) art[name] = await loadArt(name);
 const missingArt = assetNames.filter((name) => !art[name]);
 if (missingArt.length) console.error("読込失敗したギョーザ素材", missingArt);
 const bodyShadeCanvas=document.createElement("canvas"), bodyShadeCtx=bodyShadeCanvas.getContext("2d");
