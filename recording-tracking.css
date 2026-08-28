@@ -21,3 +21,5 @@
   pointer-events: none;
 }
 #trackingVideos video { width: 4px; height: 4px; }
+.format-select { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; }
+.format-select select { padding: 7px 22px 7px 8px; font-size: 10px; }

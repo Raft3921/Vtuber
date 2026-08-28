@@ -92,9 +92,20 @@ async function startRecording(){
   } catch(error){micStream?.getTracks().forEach(t=>t.stop());note(`録画を開始できません: ${error.message}`,true);}
 }
 function stopRecording(){if(recorder?.state!=="inactive")recorder.stop();clearInterval(timer);setRecordingUi(false);}
-function setRecordingUi(live){$("recordButton").classList.toggle("stop",live);$("recordButton").querySelector("span").textContent=live?"録画停止":"録画開始";$("recordDot").classList.toggle("live",live);$("recordState").textContent=live?"収録中":"収録準備";$("resolution").disabled=live;}
+function setRecordingUi(live){$("recordButton").classList.toggle("stop",live);$("recordButton").querySelector("span").textContent=live?"録画停止":"録画開始";$("recordDot").classList.toggle("live",live);$("recordState").textContent=live?"収録中":"収録準備";$("resolution").disabled=live;$("recordingFormat").disabled=live;}
 function updateTime(){const seconds=Math.floor((Date.now()-recordingStarted)/1000),h=String(Math.floor(seconds/3600)).padStart(2,"0"),m=String(Math.floor(seconds%3600/60)).padStart(2,"0"),s=String(seconds%60).padStart(2,"0");$("recordTime").textContent=`${h}:${m}:${s}`;}
-function saveRecording(){const blob=new Blob(chunks,{type:recorder.mimeType||"video/webm"}),url=URL.createObjectURL(blob),a=document.createElement("a"),stamp=new Date().toISOString().replace(/[:.]/g,"-");a.href=url;a.download=`RAFT-Vtuber-${stamp}.webm`;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);micStream?.getTracks().forEach(t=>t.stop());micStream=null;audioContext?.close();audioContext=null;note(`録画を保存しました（${(blob.size/1024/1024).toFixed(1)} MB）`);}
+function downloadWebm(blob){const url=URL.createObjectURL(blob),a=document.createElement("a"),stamp=new Date().toISOString().replace(/[:.]/g,"-");a.href=url;a.download=`RAFT-Vtuber-${stamp}.webm`;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+async function saveRecording(){
+  const blob=new Blob(chunks,{type:recorder.mimeType||"video/webm"}),format=$("recordingFormat").value;
+  micStream?.getTracks().forEach(t=>t.stop());micStream=null;audioContext?.close();audioContext=null;
+  if(format==="webm"){downloadWebm(blob);note(`WebM録画を保存しました（${(blob.size/1024/1024).toFixed(1)} MB）`);return;}
+  try{
+    $("recordState").textContent=`${format.toUpperCase()}へ変換中`;$("recordButton").disabled=true;note(`録画を${format.toUpperCase()}へ変換しています。長い4K録画では少し時間がかかります。`);
+    const response=await fetch(`/recording/export?format=${format}`,{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});const result=await response.json();if(!response.ok)throw new Error(result.error||"変換に失敗しました");
+    note(`${format.toUpperCase()}録画を保存しました：${result.path}（${(result.size/1024/1024).toFixed(1)} MB）`);
+  }catch(error){downloadWebm(blob);note(`${format.toUpperCase()}変換に失敗したためWebMで保存しました：${error.message}`,true);}
+  finally{$("recordState").textContent="収録準備";$("recordButton").disabled=false;}
+}
 $("recordButton").addEventListener("click",()=>recorder?.state==="recording"?stopRecording():startRecording());
 window.addEventListener("beforeunload",()=>{screenStream?.getTracks().forEach(t=>t.stop());micStream?.getTracks().forEach(t=>t.stop());stopTracking();});
 createMembers();

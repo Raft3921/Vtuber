@@ -2,10 +2,13 @@ import http from "node:http";
 import dgram from "node:dgram";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { readFile, writeFile, mkdir, stat, rm } from "node:fs/promises";
+import { finished } from "node:stream/promises";
+import { spawn } from "node:child_process";
 import { extname, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import ffmpegPath from "ffmpeg-static";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const httpPort = Number(process.env.VTUBER_PORT || 8777);
@@ -50,6 +53,35 @@ export const server = http.createServer(async (req, res) => {
       const now = Date.now();
       for (const [id, peer] of lanPeers) if (now - peer.seenAt > 7000) lanPeers.delete(id);
       res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify({ instanceId, peers: [...lanPeers.values()] }));
+      return;
+    }
+    if (url.pathname === "/recording/export" && req.method === "POST") {
+      const remote = req.socket.remoteAddress || "";
+      if (!remote.includes("127.0.0.1") && remote !== "::1") { res.writeHead(403).end("Local access only"); return; }
+      const format = url.searchParams.get("format") === "mp4" ? "mp4" : "mov";
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const input = join(os.tmpdir(), `raft-vtuber-${instanceId}-${stamp}.webm`);
+      const outputDir = process.env.VTUBER_RECORDING_DIR || join(os.homedir(), "Downloads");
+      const output = join(outputDir, `RAFT-Vtuber-${stamp}.${format}`);
+      try {
+        await mkdir(outputDir, { recursive: true });
+        const writer = createWriteStream(input);
+        req.pipe(writer);
+        await finished(writer);
+        await new Promise((resolveConversion, rejectConversion) => {
+          const args = ["-y", "-i", input, "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", output];
+          const process = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
+          let errorText = "";
+          process.stderr.on("data", chunk => { if (errorText.length < 8000) errorText += chunk; });
+          process.on("error", rejectConversion);
+          process.on("close", code => code === 0 ? resolveConversion() : rejectConversion(new Error(errorText.slice(-3000) || `ffmpeg code ${code}`)));
+        });
+        const info = await stat(output);
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" }).end(JSON.stringify({ path: output, size: info.size, format }));
+      } catch (error) {
+        await rm(output, { force: true }).catch(() => {});
+        res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" }).end(JSON.stringify({ error: String(error?.message || error) }));
+      } finally { await rm(input, { force: true }).catch(() => {}); }
       return;
     }
     if (url.pathname === "/settings") {
