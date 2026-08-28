@@ -2,6 +2,7 @@ import {
   app,
   BrowserWindow,
   clipboard,
+  desktopCapturer,
   dialog,
   Menu,
   nativeImage,
@@ -189,6 +190,15 @@ async function createMainWindow() {
       return;
     }
     openTracker(target.pathname, trackerTitles[target.pathname]);
+  });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      const target = new URL(url);
+      if (target.origin === baseUrl && trackerTitles[target.pathname]) {
+        openTracker(target.pathname, trackerTitles[target.pathname]);
+      }
+    } catch {}
+    return { action: "deny" };
   });
   await win.loadURL(baseUrl);
   return win;
@@ -462,6 +472,17 @@ exit 24
 app.on("second-instance", showMain);
 
 await app.whenReady();
+session.defaultSession.setDisplayMediaRequestHandler(
+  async (_request, callback) => {
+    try {
+      const sources = await desktopCapturer.getSources({ types: ["screen", "window"] });
+      callback({ video: sources[0], audio: "loopback" });
+    } catch {
+      callback({});
+    }
+  },
+  { useSystemPicker: true },
+);
 process.env.VTUBER_CONFIG_ROOT = join(app.getPath("userData"), "config");
 let embeddedServerStarted = false,
   serverRecoveryInProgress = false;

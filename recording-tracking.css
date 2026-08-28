@@ -1,0 +1,22 @@
+.camera-select {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.camera-select select {
+  max-width: 150px;
+  padding: 7px 24px 7px 8px;
+  font-size: 10px;
+}
+.ready-mark { color: var(--green); font-size: 8px; }
+#trackingVideo {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 4px;
+  height: 4px;
+  opacity: .01;
+  pointer-events: none;
+}

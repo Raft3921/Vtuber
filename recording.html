@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>収録 | RAFT Vtuber</title>
+  <link rel="stylesheet" href="recording.css">
+  <link rel="stylesheet" href="recording-tracking.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="back" href="/">← スタジオ</a>
+    <div><small>RECORDING STUDIO</small><h1>収録</h1></div>
+    <label class="resolution">画質<select id="resolution">
+      <option value="1280x720">HD 720p</option>
+      <option value="1920x1080" selected>Full HD 1080p</option>
+      <option value="2560x1440">2K 1440p</option>
+      <option value="3840x2160">4K 2160p</option>
+    </select></label>
+  </header>
+
+  <main class="recording-layout">
+    <section class="composer">
+      <div class="canvas-toolbar">
+        <button id="shareScreen" class="primary">画面を選択</button>
+        <span id="screenState"><i></i>画面未選択</span>
+        <label class="camera-select">追従カメラ<select id="cameraDevice"><option value="">カメラを選択</option></select></label>
+        <button id="trackingButton">追従開始</button>
+        <span id="trackingState"><i></i>追従停止中</span>
+        <span class="toolbar-spacer"></span>
+        <button id="fitSelected" disabled>選択キャラを中央へ</button>
+      </div>
+      <div class="stage-shell" id="stageShell">
+        <canvas id="recordingCanvas" width="1920" height="1080"></canvas>
+        <div id="emptyState" class="empty-state"><b>画面を選択</b><span>デバイスの画面やウインドウを背景として表示します</span></div>
+        <div id="transformLayer"></div>
+      </div>
+      <div class="record-bar">
+        <div class="record-status"><i id="recordDot"></i><div><strong id="recordState">収録準備</strong><span id="recordTime">00:00:00</span></div></div>
+        <label class="audio-toggle"><input id="micAudio" type="checkbox" checked><span>マイク</span></label>
+        <label class="audio-toggle"><input id="screenAudio" type="checkbox" checked><span>画面音声</span></label>
+        <button id="recordButton" class="record-button"><i></i><span>録画開始</span></button>
+      </div>
+      <p class="notice" id="notice">先に「画面を選択」を押し、共有する画面またはアプリを選んでください。</p>
+    </section>
+
+    <aside class="characters">
+      <div class="aside-head"><small>CAST</small><h2>キャラクター</h2><p>チェックしたキャラが透過で重なります</p></div>
+      <div id="memberList" class="member-list"></div>
+      <div class="transform-help"><strong>配置の操作</strong><p>ドラッグで移動<br>四隅で拡大・縮小<br>上の丸いハンドルで回転</p></div>
+    </aside>
+  </main>
+  <video id="screenVideo" autoplay muted playsinline></video>
+  <video id="trackingVideo" autoplay muted playsinline></video>
+  <div id="avatarFrames" aria-hidden="true"></div>
+  <script type="module" src="recording.js"></script>
+</body>
+</html>
