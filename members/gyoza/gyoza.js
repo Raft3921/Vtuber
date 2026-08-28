@@ -7,6 +7,7 @@ const video = $("camera");
 const query = new URLSearchParams(location.search);
 const obs = query.get("obs") === "1";
 const member = "8";
+const assetRevision = query.get("v") || "gyoza-current";
 
 document.body.classList.toggle("obs", obs);
 document.body.classList.toggle("transparent", obs && query.get("bg") === "transparent");
@@ -113,13 +114,26 @@ const assetNames = [
   "mouth-medium", "mouth-large", "mouth-smile-closed", "mouth-smile-open",
   "mouth-surprised", "mouth-frown",
 ];
-const art = Object.fromEntries(await Promise.all(assetNames.map(async (name) => {
-  const image = new Image(); image.src = `parts/${name}.png`; await image.decode(); return [name, image];
-})));
+async function loadArt(name) {
+  const image = new Image();
+  image.src = `parts/${name}.png?v=${encodeURIComponent(assetRevision)}`;
+  try {
+    await image.decode();
+    return [name, image];
+  } catch (error) {
+    console.error(`ギョーザ素材を読み込めませんでした: ${name}`, error);
+    return [name, null];
+  }
+}
+const art = Object.fromEntries(await Promise.all(assetNames.map(loadArt)));
+const missingArt = assetNames.filter((name) => !art[name]);
+if (missingArt.length) console.error("読込失敗したギョーザ素材", missingArt);
 const bodyShadeCanvas=document.createElement("canvas"), bodyShadeCtx=bodyShadeCanvas.getContext("2d");
 bodyShadeCanvas.width=bodyShadeCanvas.height=1254;
 function updateBodyShade(yaw,pitch){
-  const g=bodyShadeCtx; g.clearRect(0,0,1254,1254); g.globalCompositeOperation="source-over";
+  const g=bodyShadeCtx; g.clearRect(0,0,1254,1254);
+  if (!art["body-torso"]) return;
+  g.globalCompositeOperation="source-over";
   g.drawImage(art["body-torso"],0,0,1254,1254); g.globalCompositeOperation="source-in";
   const from=yaw>=0?430:824,to=yaw>=0?830:424,gradient=g.createLinearGradient(from,760,to,1080);
   gradient.addColorStop(0,"rgba(63,28,17,0)"); gradient.addColorStop(.58,"rgba(63,28,17,.025)");
@@ -193,16 +207,12 @@ function nearestProfile(type, fallback) {
   }
   return best;
 }
-const drawLayer = (name, alpha = 1) => { if (alpha <= 0) return; ctx.save(); ctx.globalAlpha *= alpha; ctx.drawImage(art[name], 0, 0, 1254, 1254); ctx.restore(); };
+const drawLayer = (name, alpha = 1) => {
+  if (alpha <= 0 || !art[name]) return;
+  ctx.save(); ctx.globalAlpha *= alpha; ctx.drawImage(art[name], 0, 0, 1254, 1254); ctx.restore();
+};
 function around(x, y, rotation, scaleX, scaleY, draw) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(rotation); ctx.scale(scaleX, scaleY); ctx.translate(-x, -y); draw(); ctx.restore();
-}
-function drawShoulderConnector(side) {
-  // Keep only the supplied sleeve artwork nearest the torso; this fixed root hides rotation gaps.
-  ctx.save(); ctx.beginPath();
-  if(side==="left") ctx.ellipse(535,790,49,72,-.18,0,Math.PI*2);
-  else ctx.ellipse(719,790,49,72,.18,0,Math.PI*2);
-  ctx.clip(); drawLayer(`arm-${side}`); ctx.restore();
 }
 function advanceImageBaton(state, wanted, speed = .2, pinch = .7) {
   state.queued = wanted;
@@ -246,13 +256,11 @@ function drawCharacter(now) {
   // Automatic silhouette shadow is derived from the supplied transparent PNGs.
   ctx.save(); ctx.filter=`drop-shadow(${-yaw*5}px ${7+Math.max(0,pitch)*3}px 4px rgba(45,22,16,.28))`;
   drawLayer("leg-left"); drawLayer("leg-right");
-  drawShoulderConnector("left"); drawShoulderConnector("right");
   around(535,790,armLeftAngle,1,1,()=>{ drawLayer("hand-left"); drawLayer("arm-left"); });
   around(719,790,armRightAngle,1,1,()=>{ drawLayer("hand-right"); drawLayer("arm-right"); });
   drawLayer("body-torso"); ctx.restore();
   drawLayer("leg-left"); drawLayer("leg-right");
   // Shoulder pivots stay locked to the torso; each screen-side hand remains behind its sleeve.
-  drawShoulderConnector("left"); drawShoulderConnector("right");
   around(535,790,armLeftAngle,1,1,()=>{ drawLayer("hand-left"); drawLayer("arm-left"); });
   around(719,790,armRightAngle,1,1,()=>{ drawLayer("hand-right"); drawLayer("arm-right"); });
   drawLayer("body-torso"); updateBodyShade(yaw,pitch); ctx.drawImage(bodyShadeCanvas,0,0);

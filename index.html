@@ -83,9 +83,9 @@
           <a class="camera" href="${path}" aria-label="${name}のカメラを開く"><i></i>カメラ</a>
           <div class="obs-links" aria-label="${name}のOBSリンク">
             <span>OBS</span>
-            <a href="${path}?obs=1&bg=transparent&member=${no}">透過</a>
-            <a href="${path}?obs=1&bg=green&member=${no}">GB</a>
-            <a href="${path}?obs=1&bg=blue&member=${no}">BB</a>
+            <a href="${path}?obs=1&bg=transparent&member=${no}&v=${Date.now()}">透過</a>
+            <a href="${path}?obs=1&bg=green&member=${no}&v=${Date.now()}">GB</a>
+            <a href="${path}?obs=1&bg=blue&member=${no}&v=${Date.now()}">BB</a>
           </div>`;
         root.append(card);
 

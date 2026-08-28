@@ -28,7 +28,9 @@ document.title = `${avatar.name}・ライブ`;
 document.querySelector("#memberName").textContent =
   `No.${avatar.number} ${avatar.name}`;
 
-const base = `http://127.0.0.1:8777/${slug}/?obs=1&member=${avatar.member}`;
+// A changing revision prevents OBS Browser Source from retaining an older failed page.
+const obsRevision = Date.now();
+const base = `http://127.0.0.1:8777/${slug}/?obs=1&member=${avatar.member}&v=${obsRevision}`;
 const obsLinks = document.querySelector("#obsLinks");
 obsLinks.innerHTML = [
   ["OBS 透過（推奨）", `${base}&bg=transparent`],
