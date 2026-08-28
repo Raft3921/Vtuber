@@ -1,17 +1,17 @@
-.camera-select {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.member-source {
   color: var(--muted);
   font-size: 10px;
 }
-.camera-select select {
+.member-source {
   max-width: 150px;
   padding: 7px 24px 7px 8px;
   font-size: 10px;
 }
-.ready-mark { color: var(--green); font-size: 8px; }
-#trackingVideo {
+.ready-mark { color: var(--muted); font-size: 8px; white-space: nowrap; }
+.ready-mark.online { color: var(--green); }
+.member-row { grid-template-columns: 26px 1fr auto; }
+.member-source { grid-column: 2 / 4; width: 100%; max-width: none; }
+#trackingVideos {
   position: fixed;
   left: -10000px;
   top: 0;
@@ -20,3 +20,4 @@
   opacity: .01;
   pointer-events: none;
 }
+#trackingVideos video { width: 4px; height: 4px; }

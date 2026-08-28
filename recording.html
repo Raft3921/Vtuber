@@ -24,8 +24,7 @@
       <div class="canvas-toolbar">
         <button id="shareScreen" class="primary">画面を選択</button>
         <span id="screenState"><i></i>画面未選択</span>
-        <label class="camera-select">追従カメラ<select id="cameraDevice"><option value="">カメラを選択</option></select></label>
-        <button id="trackingButton">追従開始</button>
+        <button id="trackingButton">キャラ別追従を開始</button>
         <span id="trackingState"><i></i>追従停止中</span>
         <span class="toolbar-spacer"></span>
         <button id="fitSelected" disabled>選択キャラを中央へ</button>
@@ -51,7 +50,7 @@
     </aside>
   </main>
   <video id="screenVideo" autoplay muted playsinline></video>
-  <video id="trackingVideo" autoplay muted playsinline></video>
+  <div id="trackingVideos" aria-hidden="true"></div>
   <div id="avatarFrames" aria-hidden="true"></div>
   <script type="module" src="recording.js"></script>
 </body>

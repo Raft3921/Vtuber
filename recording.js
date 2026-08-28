@@ -9,15 +9,17 @@ const canvas = $("recordingCanvas"), ctx = canvas.getContext("2d", { alpha: fals
 const screenVideo = $("screenVideo"), stageShell = $("stageShell"), transformLayer = $("transformLayer");
 const states = new Map();
 let screenStream = null, recorder = null, recordingStarted = 0, timer = 0, chunks = [], selected = null, audioContext = null, micStream = null;
-let trackingStream = null, faceLandmarker = null, trackingRunning = false, lastTrackingTime = -1, lastPoseSent = 0;
-const trackingVideo = $("trackingVideo");
+let trackingRunning = false, trackingAnimation = 0;
+const localTrackers = new Map(), lanEvents = new Map();
+let cameraDevices = [], lanPeers = [];
 
 function createMembers() {
   for (const [index, member] of members.entries()) {
     const row = document.createElement("div"); row.className = "member-row";
-    row.innerHTML = `<input id="member-${member.no}" type="checkbox"><label for="member-${member.no}">${member.name}<span>MEMBER ${String(member.no).padStart(2,"0")}</span></label><span class="ready-mark">自動追従</span>`;
+    row.innerHTML = `<input id="member-${member.no}" type="checkbox"><label for="member-${member.no}">${member.name}<span>MEMBER ${String(member.no).padStart(2,"0")}</span></label><span class="ready-mark" id="source-status-${member.no}">未接続</span><select class="member-source" id="source-${member.no}" aria-label="${member.name}の追従元"><option value="">カメラを選択</option></select>`;
     $("memberList").append(row);
     row.querySelector("input").addEventListener("change", (event) => event.target.checked ? addMember(member, index) : removeMember(member.slug));
+    row.querySelector("select").addEventListener("change",()=>{if(trackingRunning) startTracking(true);});
   }
 }
 
@@ -30,8 +32,9 @@ function addMember(member, index) {
   box.innerHTML = `<span class="name">${member.name}</span><i class="handle nw" data-mode="resize"></i><i class="handle ne" data-mode="resize"></i><i class="handle sw" data-mode="resize"></i><i class="handle se" data-mode="resize"></i><i class="handle rotate" data-mode="rotate"></i>`;
   transformLayer.append(box); state.box = box; states.set(member.slug, state); bindTransform(state); selectState(state); updateBox(state);
   box.closest(".stage-shell"); document.querySelector(`#member-${member.no}`).closest(".member-row").classList.add("active");
+  if(trackingRunning) startTracking(true);
 }
-function removeMember(slug) { const state=states.get(slug); if(!state)return; state.iframe.remove(); state.box.remove(); states.delete(slug); if(selected===state) selectState(null); document.querySelector(`#member-${state.member.no}`).closest(".member-row").classList.remove("active"); }
+function removeMember(slug) { const state=states.get(slug); if(!state)return; state.iframe.remove(); state.box.remove(); states.delete(slug); if(selected===state) selectState(null); document.querySelector(`#member-${state.member.no}`).closest(".member-row").classList.remove("active"); if(trackingRunning) startTracking(true); }
 function selectState(state) { selected=state; for(const item of states.values()) item.box.classList.toggle("selected",item===state); $("fitSelected").disabled=!state; }
 function updateBox(state) { state.box.style.left=`${(state.x-state.w/2)*100}%`; state.box.style.top=`${(state.y-state.h/2)*100}%`; state.box.style.width=`${state.w*100}%`; state.box.style.height=`${state.h*100}%`; state.box.style.transform=`rotate(${state.rotation}rad)`; }
 function bindTransform(state) {
@@ -93,44 +96,70 @@ function setRecordingUi(live){$("recordButton").classList.toggle("stop",live);$(
 function updateTime(){const seconds=Math.floor((Date.now()-recordingStarted)/1000),h=String(Math.floor(seconds/3600)).padStart(2,"0"),m=String(Math.floor(seconds%3600/60)).padStart(2,"0"),s=String(seconds%60).padStart(2,"0");$("recordTime").textContent=`${h}:${m}:${s}`;}
 function saveRecording(){const blob=new Blob(chunks,{type:recorder.mimeType||"video/webm"}),url=URL.createObjectURL(blob),a=document.createElement("a"),stamp=new Date().toISOString().replace(/[:.]/g,"-");a.href=url;a.download=`RAFT-Vtuber-${stamp}.webm`;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);micStream?.getTracks().forEach(t=>t.stop());micStream=null;audioContext?.close();audioContext=null;note(`録画を保存しました（${(blob.size/1024/1024).toFixed(1)} MB）`);}
 $("recordButton").addEventListener("click",()=>recorder?.state==="recording"?stopRecording():startRecording());
-window.addEventListener("beforeunload",()=>{screenStream?.getTracks().forEach(t=>t.stop());micStream?.getTracks().forEach(t=>t.stop());trackingStream?.getTracks().forEach(t=>t.stop());});
+window.addEventListener("beforeunload",()=>{screenStream?.getTracks().forEach(t=>t.stop());micStream?.getTracks().forEach(t=>t.stop());stopTracking();});
 createMembers();
 
 async function refreshCameras() {
   if (!navigator.mediaDevices?.enumerateDevices) return;
-  const current = $("cameraDevice").value;
-  const cameras = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === "videoinput");
-  $("cameraDevice").innerHTML = cameras.length
-    ? cameras.map((device,index)=>`<option value="${device.deviceId}">${device.label||`カメラ ${index+1}`}</option>`).join("")
-    : `<option value="">カメラが見つかりません</option>`;
-  if (cameras.some(camera=>camera.deviceId===current)) $("cameraDevice").value=current;
+  cameraDevices = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === "videoinput");
+  refreshSourceOptions();
 }
 
-async function loadFaceTracker() {
-  if (faceLandmarker) return;
+async function createFaceTracker() {
   const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/+esm");
   const files = await vision.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm");
-  faceLandmarker = await vision.FaceLandmarker.createFromOptions(files, {
+  return vision.FaceLandmarker.createFromOptions(files, {
     baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
     runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true,
     minFaceDetectionConfidence: .45, minTrackingConfidence: .45,
   });
 }
 
-async function startTracking() {
-  if (trackingRunning) return stopTracking();
+function sourceLabel(peer) { return `${peer.name}・${peer.host}`; }
+function refreshSourceOptions() {
+  for (const member of members) {
+    const select=$(`source-${member.no}`), current=select.value;
+    const local=cameraDevices.map((device,index)=>`<option value="camera:${device.deviceId}">このPC：${device.label||`カメラ ${index+1}`}</option>`);
+    const remote=lanPeers.filter(peer=>peer.activeMembers.includes(String(member.no))).map(peer=>`<option value="lan:${peer.instanceId}">LAN：${sourceLabel(peer)}（追従済み）</option>`);
+    select.innerHTML=`<option value="">追従元を選択</option>${local.join("")}${remote.join("")}`;
+    if(current&&[...select.options].some(option=>option.value===current)) select.value=current;
+    else if(remote.length) select.value=`lan:${lanPeers.find(peer=>peer.activeMembers.includes(String(member.no))).instanceId}`;
+    else if(cameraDevices.length) select.value=`camera:${cameraDevices[0].deviceId}`;
+    const status=$(`source-status-${member.no}`), peerAvailable=remote.length>0;
+    if(!trackingRunning){status.textContent=peerAvailable?"サーバーあり":"未接続";status.classList.toggle("online",peerAvailable);}
+  }
+}
+
+async function refreshLanPeers() {
+  try { const response=await fetch("/lan/peers",{cache:"no-store"}),data=await response.json();lanPeers=data.peers||[];refreshSourceOptions(); } catch {}
+}
+
+async function startTracking(restart=false) {
+  if (trackingRunning && !restart) return stopTracking();
+  if (trackingRunning) stopTracking();
   try {
     $("trackingButton").disabled=true; $("trackingButton").textContent="準備中…";
-    const deviceId=$("cameraDevice").value;
-    trackingStream=await navigator.mediaDevices.getUserMedia({video:{...(deviceId?{deviceId:{exact:deviceId}}:{}),width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30}},audio:false});
-    trackingVideo.srcObject=trackingStream; await trackingVideo.play(); await refreshCameras(); await loadFaceTracker();
+    const assignments=[...states.values()].map(state=>({state,source:$(`source-${state.member.no}`).value})).filter(item=>item.source);
+    const localGroups=new Map();
+    for(const assignment of assignments){
+      if(assignment.source.startsWith("camera:")){const deviceId=assignment.source.slice(7);if(!localGroups.has(deviceId))localGroups.set(deviceId,[]);localGroups.get(deviceId).push(assignment.state.member.no);}
+      if(assignment.source.startsWith("lan:")) connectLanSource(assignment.state.member,assignment.source.slice(4));
+    }
+    for(const [deviceId,memberNumbers] of localGroups) await openLocalTracker(deviceId,memberNumbers);
+    if(!localGroups.size&&!lanEvents.size) throw new Error("表示するキャラの追従元を選択してください");
     trackingRunning=true; $("trackingButton").disabled=false; $("trackingButton").textContent="追従停止"; $("trackingState").classList.add("live"); $("trackingState").lastChild.textContent=" 追従中";
-    note("顔追従中です。追加したキャラクターは個別画面を開かなくても自動で動きます。");
-    requestAnimationFrame(trackFrame);
-  } catch(error) { trackingStream?.getTracks().forEach(track=>track.stop());trackingStream=null;$("trackingButton").disabled=false;$("trackingButton").textContent="追従開始";note(`カメラを開始できません: ${error.message}`,true); }
+    note("キャラ別追従中です。各キャラは選択したカメラまたはLAN上のPCから動きを受け取ります。");
+    trackingAnimation=requestAnimationFrame(trackFrames);
+  } catch(error) { stopTracking();$("trackingButton").disabled=false;note(`追従を開始できません: ${error.message}`,true); }
 }
 function stopTracking() {
-  trackingRunning=false;trackingStream?.getTracks().forEach(track=>track.stop());trackingStream=null;trackingVideo.srcObject=null;$("trackingButton").textContent="追従開始";$("trackingState").classList.remove("live");$("trackingState").lastChild.textContent=" 追従停止中";
+  trackingRunning=false;cancelAnimationFrame(trackingAnimation);for(const tracker of localTrackers.values()){tracker.stream.getTracks().forEach(track=>track.stop());tracker.landmarker?.close();tracker.video.remove();}localTrackers.clear();for(const event of lanEvents.values())event.close();lanEvents.clear();$("trackingButton").textContent="キャラ別追従を開始";$("trackingState").classList.remove("live");$("trackingState").lastChild.textContent=" 追従停止中";for(const member of members){const status=$(`source-status-${member.no}`);status.textContent="未接続";status.classList.remove("online");}refreshSourceOptions();
+}
+async function openLocalTracker(deviceId,memberNumbers){
+  const stream=await navigator.mediaDevices.getUserMedia({video:{...(deviceId?{deviceId:{exact:deviceId}}:{}),width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30}},audio:false}),video=document.createElement("video");video.autoplay=true;video.muted=true;video.playsInline=true;video.srcObject=stream;$("trackingVideos").append(video);await video.play();const landmarker=await createFaceTracker();localTrackers.set(deviceId,{stream,video,landmarker,memberNumbers,lastVideoTime:-1,lastSent:0});for(const no of memberNumbers){const status=$(`source-status-${no}`);status.textContent="カメラ追従中";status.classList.add("online");}await refreshCameras();
+}
+function connectLanSource(member,instanceId){
+  const peer=lanPeers.find(item=>item.instanceId===instanceId);if(!peer)return;const event=new EventSource(`http://${peer.host}:${peer.port}/events?member=${member.no}`);event.onmessage=message=>fetch(`/pose?member=${member.no}`,{method:"POST",headers:{"Content-Type":"application/json"},body:message.data}).catch(()=>{});event.onopen=()=>{const status=$(`source-status-${member.no}`);status.textContent="追従済み";status.classList.add("online");};event.onerror=()=>{const status=$(`source-status-${member.no}`);status.textContent="再接続中";status.classList.remove("online");};lanEvents.set(member.no,event);
 }
 function blendshapeMap(result) { return Object.fromEntries((result.faceBlendshapes?.[0]?.categories||[]).map(item=>[item.categoryName,item.score])); }
 function makePose(result) {
@@ -140,12 +169,12 @@ function makePose(result) {
   const eyeL=1-(shapes.eyeBlinkLeft||0),eyeR=1-(shapes.eyeBlinkRight||0);
   return {x:(nose.x-.5)*-2.6,y:(nose.y-.48)*2.1,roll:Math.atan2(right.y-left.y,right.x-left.x)*-1,depth:Math.max(-1,Math.min(1,(Math.hypot(right.x-left.x,right.y-left.y)-.29)*5)),voice:mouth,mouth,gazeX:((shapes.eyeLookOutLeft||0)-(shapes.eyeLookInLeft||0)+(shapes.eyeLookInRight||0)-(shapes.eyeLookOutRight||0))/2,gazeY:((shapes.eyeLookDownLeft||0)+(shapes.eyeLookDownRight||0)-(shapes.eyeLookUpLeft||0)-(shapes.eyeLookUpRight||0))/2,eyeOpen:(eyeL+eyeR)/2,eyeL,eyeR,smile:((shapes.mouthSmileLeft||0)+(shapes.mouthSmileRight||0))/2,brow:(shapes.browInnerUp||0)-((shapes.browDownLeft||0)+(shapes.browDownRight||0))/2,speaking:mouth>.06};
 }
-function trackFrame(now) {
+function trackFrames(now) {
   if(!trackingRunning)return;
-  if(trackingVideo.readyState>=2&&trackingVideo.currentTime!==lastTrackingTime&&now-lastPoseSent>32){lastTrackingTime=trackingVideo.currentTime;lastPoseSent=now;const pose=makePose(faceLandmarker.detectForVideo(trackingVideo,now));if(pose){for(const state of states.values())fetch(`/pose?member=${state.member.no}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(pose)}).catch(()=>{});}}
-  requestAnimationFrame(trackFrame);
+  for(const tracker of localTrackers.values())if(tracker.video.readyState>=2&&tracker.video.currentTime!==tracker.lastVideoTime&&now-tracker.lastSent>32){tracker.lastVideoTime=tracker.video.currentTime;tracker.lastSent=now;const pose=makePose(tracker.landmarker.detectForVideo(tracker.video,now));if(pose)for(const no of tracker.memberNumbers)fetch(`/pose?member=${no}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(pose)}).catch(()=>{});}
+  trackingAnimation=requestAnimationFrame(trackFrames);
 }
 $("trackingButton").addEventListener("click",startTracking);
-$("cameraDevice").addEventListener("change",async()=>{if(trackingRunning){stopTracking();await startTracking();}});
 navigator.mediaDevices?.addEventListener?.("devicechange",refreshCameras);
 refreshCameras();
+refreshLanPeers();setInterval(refreshLanPeers,2000);

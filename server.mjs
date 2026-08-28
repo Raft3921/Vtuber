@@ -1,10 +1,16 @@
 import http from "node:http";
+import dgram from "node:dgram";
+import os from "node:os";
+import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { extname, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
+const httpPort = Number(process.env.VTUBER_PORT || 8777);
+const discoveryPort = Number(process.env.VTUBER_DISCOVERY_PORT || 47777);
+const instanceId = process.env.VTUBER_INSTANCE_ID || randomUUID();
 const configRoot = process.env.VTUBER_CONFIG_ROOT || join(root, "config");
 const defaultConfigRoot = join(root, "config");
 await mkdir(configRoot, { recursive: true });
@@ -22,7 +28,9 @@ const configFileForMember = (member) =>
 
 const weekRoot = join(root, "members", "week");
 const clients = new Map(),
-  latest = new Map();
+  latest = new Map(),
+  latestAt = new Map(),
+  lanPeers = new Map();
 const mime = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -38,6 +46,12 @@ const group = (id) => {
 export const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://127.0.0.1");
     const member = url.searchParams.get("member") || "7";
+    if (url.pathname === "/lan/peers" && req.method === "GET") {
+      const now = Date.now();
+      for (const [id, peer] of lanPeers) if (now - peer.seenAt > 7000) lanPeers.delete(id);
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify({ instanceId, peers: [...lanPeers.values()] }));
+      return;
+    }
     if (url.pathname === "/settings") {
       const file = join(configRoot, configFileForMember(member));
       if (req.method === "GET") {
@@ -101,6 +115,7 @@ export const server = http.createServer(async (req, res) => {
       });
       req.on("end", () => {
         latest.set(member, body || "{}");
+        latestAt.set(member, Date.now());
         for (const c of group(member))
           c.write(`data: ${latest.get(member)}\n\n`);
         res.writeHead(204).end();
@@ -112,6 +127,7 @@ export const server = http.createServer(async (req, res) => {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
       });
       res.write(`data: ${latest.get(member) || "{}"}\n\n`);
       group(member).add(res);
@@ -180,9 +196,9 @@ export const server = http.createServer(async (req, res) => {
 
 export const serverReady = new Promise((resolve, reject) => {
   server.once("error", reject);
-  server.listen(8777, "127.0.0.1", () => {
+  server.listen(httpPort, "0.0.0.0", () => {
     server.off("error", reject);
-    console.log("RAFT Vtuber: http://127.0.0.1:8777/");
+    console.log(`RAFT Vtuber: http://127.0.0.1:${httpPort}/`);
     resolve(server);
   });
 });
@@ -191,3 +207,22 @@ server.keepAliveTimeout = 5000;
 server.headersTimeout = 10000;
 
 await serverReady;
+
+const discovery = dgram.createSocket({ type: "udp4", reuseAddr: true });
+discovery.on("message", (message, remote) => {
+  try {
+    const data = JSON.parse(message.toString("utf8"));
+    if (data.app !== "raft-vtuber" || data.instanceId === instanceId) return;
+    lanPeers.set(data.instanceId, { instanceId: data.instanceId, name: data.name || remote.address, host: remote.address, port: Number(data.port || 8777), activeMembers: Array.isArray(data.activeMembers) ? data.activeMembers.map(String) : [], seenAt: Date.now() });
+  } catch {}
+});
+discovery.bind(discoveryPort, "0.0.0.0", () => discovery.setBroadcast(true));
+const advertise = () => {
+  const now = Date.now(), activeMembers = [...latestAt].filter(([,at]) => now-at < 5000).map(([member]) => String(member));
+  const packet = Buffer.from(JSON.stringify({ app: "raft-vtuber", instanceId, name: os.hostname(), port: httpPort, activeMembers }));
+  discovery.send(packet, discoveryPort, "255.255.255.255", () => {});
+};
+advertise();
+const discoveryTimer = setInterval(advertise, 2000);
+discoveryTimer.unref();
+server.on("close", () => discovery.close());

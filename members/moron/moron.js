@@ -10,12 +10,14 @@ import {
   appendVisualSection,
 } from "../shared/settings-ui.js";
 import { drawFaceAccessory } from "../shared/accessory-hotkeys.js";
+import { createDepthRig } from "../shared/depth-rig.js";
 
 const $ = (id) => document.getElementById(id),
   canvas = $("stage"),
   video = $("camera"),
   displayCtx = canvas.getContext("2d");
 let ctx = displayCtx;
+const depthRig = createDepthRig();
 const characterCanvas = document.createElement("canvas"),
   characterCtx = characterCanvas.getContext("2d"),
   tintCanvas = document.createElement("canvas"),
@@ -486,6 +488,8 @@ const target = {
     x: 0,
     y: 0,
     roll: 0,
+    yaw: 0,
+    pitch: 0,
     depth: 0,
     mouth: 0,
     gazeX: 0,
@@ -619,6 +623,8 @@ function track(now) {
     target.x = Math.sin(now * 0.0012) * 0.65;
     target.y = Math.sin(now * 0.0017) * 0.25;
     target.roll = Math.sin(now * 0.0014) * 0.16;
+    target.yaw = Math.sin(now * 0.00082) * 0.72;
+    target.pitch = Math.sin(now * 0.00103) * 0.28;
     target.depth = Math.sin(now * 0.0009) * 0.5;
     target.mouth = Math.max(0, Math.sin(now * 0.006));
     target.gazeX = Math.sin(now * 0.003);
@@ -718,6 +724,8 @@ function track(now) {
   target.x = (0.5 - nose.x) * 2.4;
   target.y = (nose.y - 0.48) * 1.9;
   target.roll = -Math.atan2(right.y - left.y, right.x - left.x);
+  target.yaw = Math.max(-0.9, Math.min(0.9, -((nose.x - (left.x + right.x) / 2) / Math.max(0.001, faceW)) * 4.2));
+  target.pitch = Math.max(-0.65, Math.min(0.65, ((nose.y - (top.y + chin.y) / 2) / faceH) * 3.2));
   target.depth = Math.max(-1, Math.min(1, (faceW - 0.29) * 5));
 }
 function draw(img, x, y, rot = 0, sx = 1, sy = 1) {
@@ -1371,12 +1379,13 @@ function render(now) {
   const idleX = Math.sin(now * 0.00073) * 1.8,
     idleY = Math.sin(now * 0.00107) * 2.3,
     breath = Math.sin(now * 0.0021),
+    depth3d = depthRig.update(pose.yaw, pose.pitch),
     x = pose.x * 48 + idleX,
     y = pose.y * 34 - pose.depth * 8 + idleY,
     rot = pose.roll * 0.48 + Math.sin(now * 0.00061) * 0.004,
     fit = 1 - Math.min(0.12, Math.abs(rot) * 0.18),
-    outerScaleX = fit * (1 + breath * 0.0025),
-    outerScaleY = fit * (1 + breath * 0.006);
+    outerScaleX = fit * (1 + breath * 0.0025) * depth3d.squashX,
+    outerScaleY = fit * (1 + breath * 0.006) * depth3d.stretchY;
   updateSecondary(now, rot);
   ctx.save();
   ctx.translate(627, 1190);
@@ -1423,6 +1432,7 @@ function render(now) {
     drawHairGroup("front", x, y, now);
   });
   ctx.restore();
+  depthRig.drawLighting(characterCtx, characterCanvas, depth3d.yaw, depth3d.pitch);
   ctx = displayCtx;
   compositeCharacter();
   if ($("adjuster").open) {

@@ -10,6 +10,7 @@ import {
   appendVisualSection,
 } from "../shared/settings-ui.js";
 import { drawFaceAccessory } from "../shared/accessory-hotkeys.js";
+import { createDepthRig } from "../shared/depth-rig.js";
 
 const $ = (id) => document.getElementById(id),
   canvas = $("stage"),
@@ -24,6 +25,7 @@ const characterCanvas = document.createElement("canvas"),
   hairHitCtx = hairHitCanvas.getContext("2d", { willReadFrequently: true }),
   adjustCanvas = $("adjustStage"),
   adjustCtx = adjustCanvas.getContext("2d");
+const depthRig = createDepthRig();
 characterCanvas.width =
   characterCanvas.height =
   tintCanvas.width =
@@ -531,6 +533,8 @@ const target = {
     x: 0,
     y: 0,
     roll: 0,
+    yaw: 0,
+    pitch: 0,
     depth: 0,
     mouth: 0,
     gazeX: 0,
@@ -664,6 +668,8 @@ function track(now) {
     target.x = Math.sin(now * 0.0012) * 0.65;
     target.y = Math.sin(now * 0.0017) * 0.25;
     target.roll = Math.sin(now * 0.0014) * 0.16;
+    target.yaw = Math.sin(now * 0.00082) * 0.72;
+    target.pitch = Math.sin(now * 0.00103) * 0.28;
     target.depth = Math.sin(now * 0.0009) * 0.5;
     target.mouth = Math.max(0, Math.sin(now * 0.006));
     target.gazeX = Math.sin(now * 0.003);
@@ -763,6 +769,8 @@ function track(now) {
   target.x = (0.5 - nose.x) * 2.4;
   target.y = (nose.y - 0.48) * 1.9;
   target.roll = -Math.atan2(right.y - left.y, right.x - left.x);
+  target.yaw = Math.max(-0.9, Math.min(0.9, -((nose.x - (left.x + right.x) / 2) / Math.max(0.001, faceW)) * 4.2));
+  target.pitch = Math.max(-0.65, Math.min(0.65, ((nose.y - (top.y + chin.y) / 2) / faceH) * 3.2));
   target.depth = Math.max(-1, Math.min(1, (faceW - 0.29) * 5));
 }
 function draw(img, x, y, rot = 0, sx = 1, sy = 1) {
@@ -1372,19 +1380,20 @@ function render(now) {
   const idleX = Math.sin(now * 0.00073) * 1.8,
     idleY = Math.sin(now * 0.00107) * 2.3,
     breath = Math.sin(now * 0.0021),
+    depth3d = depthRig.update(pose.yaw, pose.pitch),
     x = pose.x * 48 + idleX,
     y = pose.y * 34 - pose.depth * 8 + idleY,
     rot = pose.roll * 0.48 + Math.sin(now * 0.00061) * 0.004,
     fit = 1 - Math.min(0.12, Math.abs(rot) * 0.18),
-    outerScaleX = fit * (1 + breath * 0.0025),
-    outerScaleY = fit * (1 + breath * 0.006);
+    outerScaleX = fit * (1 + breath * 0.0025) * depth3d.squashX,
+    outerScaleY = fit * (1 + breath * 0.006) * depth3d.stretchY;
   updateSecondary(now, rot);
   ctx.save();
   ctx.translate(627, 1190);
   ctx.scale(outerScaleX, outerScaleY);
   ctx.rotate(rot * 0.55);
   ctx.translate(-627, -1190);
-  outlinedLayer(() => drawBackHair(x, y, now));
+  outlinedLayer(() => drawBackHair(x + depth3d.backX, y + depth3d.backY, now));
   outlinedLayer(() => {
     const bodyY = y + sway.neck * 7;
     draw(baseNoNose, x, bodyY);
@@ -1408,29 +1417,31 @@ function render(now) {
     ctx.scale(mapping.layout.noseScale, mapping.layout.noseScale);
     ctx.drawImage(nosePart, -25, -30);
     ctx.restore();
-    drawBlinkAsset(mapping.eye[blinkFrame], x, y);
+    const faceX = x + depth3d.faceX, faceY = y + depth3d.faceY;
+    drawBlinkAsset(mapping.eye[blinkFrame], faceX, faceY);
     const browVisual = advanceBaton(browBaton, nearest("brow", browState()));
-    drawBrows(mapping.brow[browVisual.index], x, y);
+    drawBrows(mapping.brow[browVisual.index], faceX, faceY);
     const mouthVisual = advanceMouthBaton(nearestMouth()),
       mouthInfo = mouthAssetInfo(mouthVisual.index);
     drawMouthFixed(
       mouthInfo,
-      627 + x,
-      756 + y + mapping.layout.mouthY,
+      627 + faceX,
+      756 + faceY + mapping.layout.mouthY,
       mouthVisual.sx,
       mouthVisual.sy,
     );
     drawFaceAccessory(ctx, {
-      centerX: 627 + x,
-      centerY: 627 + y,
+      centerX: 627 + faceX,
+      centerY: 627 + faceY,
       rotation: pose.roll * 0.12,
     });
   });
   outlinedLayer(() => {
-    drawHairGroup("upper", x, y, now);
-    drawHairGroup("front", x, y, now);
+    drawHairGroup("upper", x + depth3d.frontX, y + depth3d.frontY, now);
+    drawHairGroup("front", x + depth3d.frontX, y + depth3d.frontY, now);
   });
   ctx.restore();
+  depthRig.drawLighting(characterCtx, characterCanvas, depth3d.yaw, depth3d.pitch);
   ctx = displayCtx;
   compositeCharacter();
   if ($("adjuster").open) {
