@@ -17,10 +17,18 @@ $("openAdjuster").hidden = true;
 $("openMapper").hidden = false;
 document.querySelector("aside > p").textContent = "餃子の皮・3つの山・目餃子・口餃子を立体追跡";
 
-const target = { x: 0, y: 0, roll: 0, yaw: 0, pitch: 0, depth: 0, mouth: 0, eyeL: 1, eyeR: 1, gazeX: 0, gazeY: 0, smile: 0, brow: 0, armLeft: 0, armRight: 0 };
+const target = {
+  x: 0, y: 0, roll: 0, yaw: 0, pitch: 0, depth: 0,
+  mouth: 0, eyeL: 1, eyeR: 1,
+  gazeX: 0, gazeY: 0, gazeLX: 0, gazeLY: 0, gazeRX: 0, gazeRY: 0,
+  smile: 0, brow: 0,
+  armLeft: 0, armRight: 0, elbowLeft: 0, elbowRight: 0,
+};
 const pose = { ...target };
 let running = false, demo = false, stream, landmarker, poseLandmarker, lastVideo = -1, lastSend = 0;
+let lastPoseDetection=-Infinity,cachedBody=null;
 let pleatSpring = 0, pleatVelocity = 0, bodySpring = 0, bodyVelocity = 0;
+let lastShadeYaw=Infinity,lastShadePitch=Infinity;
 const eyeBatons = {
   left: { current: "eye-left-open", to: "eye-left-open", queued: "eye-left-open", p: 1 },
   right: { current: "eye-right-open", to: "eye-right-open", queued: "eye-right-open", p: 1 },
@@ -58,7 +66,7 @@ async function start() {
     return true;
   } catch (error) { console.error(error); status("カメラを開始できません"); return false; }
 }
-function stop() { running = false; stream?.getTracks().forEach((track) => track.stop()); stream = null; landmarker?.close(); poseLandmarker?.close(); landmarker = null; poseLandmarker = null; $("start").textContent = "カメラを開始"; status("停止中"); }
+function stop() { running = false; stream?.getTracks().forEach((track) => track.stop()); stream = null; landmarker?.close(); poseLandmarker?.close(); landmarker = null; poseLandmarker = null; cachedBody=null; lastPoseDetection=-Infinity; $("start").textContent = "カメラを開始"; status("停止中"); }
 function frame(now) { if (!running) return; track(now); send(now); video.requestVideoFrameCallback(frame); }
 function shapeMap(result) { return Object.fromEntries((result?.faceBlendshapes?.[0]?.categories || []).map((v) => [v.categoryName, v.score])); }
 function track(now) {
@@ -66,20 +74,34 @@ function track(now) {
     target.x = Math.sin(now * .0011) * .65; target.y = Math.sin(now * .0017) * .24;
     target.yaw = Math.sin(now * .00082) * .72; target.pitch = Math.sin(now * .00103) * .28; target.roll = Math.sin(now * .0013) * .14;
     target.depth = Math.sin(now * .0007) * .4; target.mouth = .5 + .5 * Math.sin(now * .0055);
-    target.eyeL = target.eyeR = .12 + .88 * Math.abs(Math.sin(now * .00165)); target.gazeX = Math.sin(now * .002); target.gazeY = Math.sin(now * .0016);
+    target.eyeL = .12 + .88 * Math.abs(Math.sin(now * .00165));
+    target.eyeR = .12 + .88 * Math.abs(Math.sin(now * .00165 + .2));
+    target.gazeLX = Math.sin(now * .002); target.gazeLY = Math.sin(now * .0016);
+    target.gazeRX = Math.sin(now * .002 + .14); target.gazeRY = Math.sin(now * .0016 + .1);
+    target.gazeX = (target.gazeLX + target.gazeRX) / 2; target.gazeY = (target.gazeLY + target.gazeRY) / 2;
     target.smile = .5 + .5 * Math.sin(now * .0011 + 1); target.brow = .5 + .5 * Math.sin(now * .0014);
-    target.armLeft=.15+.75*Math.sin(now*.00115); target.armRight=.15+.75*Math.sin(now*.00115+2.1); return;
+    target.armLeft=.15+.75*Math.sin(now*.00115); target.armRight=.15+.75*Math.sin(now*.00115+2.1);
+    target.elbowLeft=.72*Math.sin(now*.0017+.4); target.elbowRight=.72*Math.sin(now*.00155+2.4); return;
   }
   if (!running || video.currentTime === lastVideo) return;
   lastVideo = video.currentTime;
-  const poseResult=poseLandmarker?.detectForVideo(video,now), body=poseResult?.landmarks?.[0];
+  if(now-lastPoseDetection>=50){ cachedBody=poseLandmarker?.detectForVideo(video,now)?.landmarks?.[0]||null; lastPoseDetection=now; }
+  const body=cachedBody;
   if(body?.length>=17){
     const torso=Math.max(.08,Math.hypot(body[11].x-body[12].x,body[11].y-body[12].y));
     const lift=(shoulder,wrist)=>clamp((shoulder.y-wrist.y)/torso+.58,-1,1);
     // Naming is screen-relative: camera-right biological arm drives the screen-left artwork.
-    if((body[12].visibility??1)>.35&&(body[16].visibility??1)>.35) target.armLeft=lift(body[12],body[16]);
-    if((body[11].visibility??1)>.35&&(body[15].visibility??1)>.35) target.armRight=lift(body[11],body[15]);
-  } else { target.armLeft*=.92; target.armRight*=.92; }
+    const bend=(shoulder,elbow,wrist,mirror)=>{
+      const upper=Math.atan2(elbow.y-shoulder.y,elbow.x-shoulder.x);
+      const lower=Math.atan2(wrist.y-elbow.y,wrist.x-elbow.x);
+      let delta=lower-upper;
+      while(delta>Math.PI)delta-=Math.PI*2;
+      while(delta< -Math.PI)delta+=Math.PI*2;
+      return clamp(delta*mirror/1.25,-1,1);
+    };
+    if((body[12].visibility??1)>.35&&(body[14].visibility??1)>.35&&(body[16].visibility??1)>.35){ target.armLeft=lift(body[12],body[16]); target.elbowLeft=bend(body[12],body[14],body[16],-1); }
+    if((body[11].visibility??1)>.35&&(body[13].visibility??1)>.35&&(body[15].visibility??1)>.35){ target.armRight=lift(body[11],body[15]); target.elbowRight=bend(body[11],body[13],body[15],1); }
+  } else { target.armLeft*=.92; target.armRight*=.92; target.elbowLeft*=.9; target.elbowRight*=.9; }
   const result = landmarker?.detectForVideo(video, now), lm = result?.faceLandmarks?.[0];
   if (!lm) { status("顔を探しています…"); return; }
   status("追従中");
@@ -101,7 +123,9 @@ function track(now) {
     const center = (pts) => pts.reduce((o, p) => ({ x: o.x + p.x / pts.length, y: o.y + p.y / pts.length }), { x: 0, y: 0 });
     const gaze = (iris, a, b) => ({ x: ((iris.x - (a.x + b.x) / 2) / Math.max(.001, Math.abs(a.x - b.x))) * 4, y: ((iris.y - (a.y + b.y) / 2) / Math.max(.001, Math.abs(a.x - b.x))) * 5 });
     const gl = gaze(center(lm.slice(468, 473)), lm[33], lm[133]), gr = gaze(center(lm.slice(473, 478)), lm[362], lm[263]);
-    target.gazeX = clamp(-(gl.x + gr.x) / 2, -1, 1); target.gazeY = clamp((gl.y + gr.y) / 2, -1, 1);
+    target.gazeLX=clamp(-gl.x,-1,1); target.gazeLY=clamp(gl.y,-1,1);
+    target.gazeRX=clamp(-gr.x,-1,1); target.gazeRY=clamp(gr.y,-1,1);
+    target.gazeX=(target.gazeLX+target.gazeRX)/2; target.gazeY=(target.gazeLY+target.gazeRY)/2;
   }
 }
 
@@ -119,10 +143,18 @@ async function loadArt(name) {
   image.src = `parts/${name}.png?v=${encodeURIComponent(assetRevision)}`;
   try {
     await image.decode();
-    const layer = document.createElement("canvas");
-    layer.width = layer.height = 1254;
-    layer.getContext("2d").drawImage(image, 0, 0, 1254, 1254);
-    return layer;
+    const full = document.createElement("canvas");
+    full.width = full.height = 1254;
+    const fullCtx = full.getContext("2d", { willReadFrequently: true });
+    fullCtx.drawImage(image, 0, 0, 1254, 1254);
+    const pixels=fullCtx.getImageData(0,0,1254,1254).data;
+    let x0=1254,y0=1254,x1=-1,y1=-1;
+    for(let y=0;y<1254;y++) for(let x=0;x<1254;x++) if(pixels[(y*1254+x)*4+3]>1){ x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y); }
+    if(x1<0)return null;
+    const width=x1-x0+1,height=y1-y0+1,layer=document.createElement("canvas");
+    layer.width=width; layer.height=height;
+    layer.getContext("2d").drawImage(full,x0,y0,width,height,0,0,width,height);
+    return {image:layer,x:x0,y:y0,width,height};
   } catch (error) {
     console.error(`ギョーザ素材を読み込めませんでした: ${name}`, error);
     return null;
@@ -140,7 +172,8 @@ function updateBodyShade(yaw,pitch){
   const g=bodyShadeCtx; g.clearRect(0,0,1254,1254);
   if (!art["body-torso"]) return;
   g.globalCompositeOperation="source-over";
-  g.drawImage(art["body-torso"],0,0,1254,1254); g.globalCompositeOperation="source-in";
+  const torso=art["body-torso"];
+  g.drawImage(torso.image,torso.x,torso.y); g.globalCompositeOperation="source-in";
   const from=yaw>=0?430:824,to=yaw>=0?830:424,gradient=g.createLinearGradient(from,760,to,1080);
   gradient.addColorStop(0,"rgba(63,28,17,0)"); gradient.addColorStop(.58,"rgba(63,28,17,.025)");
   gradient.addColorStop(.72,"rgba(63,28,17,.12)"); gradient.addColorStop(1,`rgba(49,22,14,${.2+Math.abs(yaw)*.1+Math.max(0,pitch)*.05})`);
@@ -215,8 +248,15 @@ function nearestProfile(type, fallback) {
 }
 const drawLayer = (name, alpha = 1) => {
   if (alpha <= 0 || !art[name]) return;
-  ctx.save(); ctx.globalAlpha *= alpha; ctx.drawImage(art[name], 0, 0, 1254, 1254); ctx.restore();
+  const layer=art[name];
+  ctx.save(); ctx.globalAlpha *= alpha; ctx.drawImage(layer.image,layer.x,layer.y); ctx.restore();
 };
+function drawLayerCrop(g,name,sx,sy,sw,sh,dx,dy,dw,dh){
+  const layer=art[name]; if(!layer)return;
+  const ix=Math.max(sx,layer.x),iy=Math.max(sy,layer.y),ir=Math.min(sx+sw,layer.x+layer.width),ib=Math.min(sy+sh,layer.y+layer.height);
+  if(ir<=ix||ib<=iy)return;
+  g.drawImage(layer.image,ix-layer.x,iy-layer.y,ir-ix,ib-iy,dx+(ix-sx)/sw*dw,dy+(iy-sy)/sh*dh,(ir-ix)/sw*dw,(ib-iy)/sh*dh);
+}
 function around(x, y, rotation, scaleX, scaleY, draw) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(rotation); ctx.scale(scaleX, scaleY); ctx.translate(-x, -y); draw(); ctx.restore();
 }
@@ -245,6 +285,18 @@ function drawEye(side, openness, smile, yaw) {
     around(x,y,0,visual.sx,visual.sy,()=>drawLayer(visual.name));
   });
 }
+function drawBentArm(side, shoulderAngle, elbowAmount) {
+  const left=side==="left", shoulderX=left?535:719, shoulderY=790;
+  const wristX=left?382:872, wristY=887;
+  const bend=clamp(elbowAmount,-1,1);
+  const armName=`arm-${side}`, handName=`hand-${side}`;
+  // Each supplied sleeve is one continuous drawing. Render it once only; use
+  // elbow tracking as a soft shoulder rotation/squash and articulate the hand.
+  around(shoulderX,shoulderY,shoulderAngle+bend*(left?-.09:.09),1,1-Math.abs(bend)*.035,()=>{
+    around(wristX,wristY,bend*(left?-.22:.22),1,1,()=>drawLayer(handName));
+    drawLayer(armName);
+  });
+}
 function mouthName() {
   const fallback = pose.smile>.38 ? (pose.mouth>.24?5:4) : pose.brow<-.16&&pose.mouth<.3 ? 7 : pose.mouth>.72&&pose.eyeL>.75&&pose.eyeR>.75 ? 6 : pose.mouth>.54 ? 3 : pose.mouth>.31 ? 2 : pose.mouth>.07 ? 1 : 0;
   return expressionAssets.mouth[nearestProfile("mouth",fallback)];
@@ -259,29 +311,26 @@ function drawCharacter(now) {
   const bodyBob = Math.sin(now*.002)*2+bodySpring*.2;
   ctx.save(); ctx.translate(0,bodyBob);
   const armLeftAngle=clamp(pose.armLeft,-1,1)*.34, armRightAngle=-clamp(pose.armRight,-1,1)*.34;
-  // Automatic silhouette shadow is derived from the supplied transparent PNGs.
-  ctx.save(); ctx.filter=`drop-shadow(${-yaw*5}px ${7+Math.max(0,pitch)*3}px 4px rgba(45,22,16,.28))`;
-  drawLayer("leg-left"); drawLayer("leg-right");
-  around(535,790,armLeftAngle,1,1,()=>{ drawLayer("hand-left"); drawLayer("arm-left"); });
-  around(719,790,armRightAngle,1,1,()=>{ drawLayer("hand-right"); drawLayer("arm-right"); });
-  drawLayer("body-torso"); ctx.restore();
+  // Keep the studio's depth cue cheap; OBS avoids this extra filtered pass.
+  if(!obs){ ctx.save(); ctx.filter=`drop-shadow(${-yaw*4}px ${6+Math.max(0,pitch)*2}px 3px rgba(45,22,16,.22))`; drawLayer("body-torso"); ctx.restore(); }
   drawLayer("leg-left"); drawLayer("leg-right");
   // Shoulder pivots stay locked to the torso; each screen-side hand remains behind its sleeve.
-  around(535,790,armLeftAngle,1,1,()=>{ drawLayer("hand-left"); drawLayer("arm-left"); });
-  around(719,790,armRightAngle,1,1,()=>{ drawLayer("hand-right"); drawLayer("arm-right"); });
-  drawLayer("body-torso"); updateBodyShade(yaw,pitch); ctx.drawImage(bodyShadeCanvas,0,0);
+  drawBentArm("left",armLeftAngle,pose.elbowLeft); drawBentArm("right",armRightAngle,pose.elbowRight);
+  drawLayer("body-torso");
+  if(Math.abs(yaw-lastShadeYaw)>.018||Math.abs(pitch-lastShadePitch)>.018){ updateBodyShade(yaw,pitch); lastShadeYaw=yaw; lastShadePitch=pitch; }
+  ctx.drawImage(bodyShadeCanvas,0,0);
   drawLayer("neck"); ctx.restore();
-  const headShift = yaw*32;
-  ctx.save(); ctx.translate(headShift,pitch*9);
+  const headShift = yaw*42;
+  ctx.save(); ctx.translate(627+headShift,590+pitch*12); ctx.rotate(pose.roll*.08); ctx.scale(1-Math.abs(yaw)*.035,1+pitch*.018); ctx.translate(-627,-590);
   drawLayer("head-base");
   ctx.save(); if (yaw>0) { ctx.translate(1254,0); ctx.scale(-1,1); } drawLayer("head-shadow-left", .18+Math.abs(yaw)*.56); ctx.restore();
   drawLayer("head-highlight", .42);
   const browFallback=pose.brow>.3?0:pose.brow<-.16?2:1, browIndex=nearestProfile("brow",browFallback), browShape=[-.055,0,.06][browIndex];
   around(485,380,browShape+pleatSpring*.012,1,1,()=>drawLayer("head-crease-left"));
   around(769,380,-browShape-pleatSpring*.012,1,1,()=>drawLayer("head-crease-right"));
-  ctx.save(); ctx.translate(pose.gazeX*6,pose.gazeY*4); drawEye("left",pose.eyeL,pose.smile,yaw); drawEye("right",pose.eyeR,pose.smile,yaw); ctx.restore();
+  ctx.save(); ctx.translate(yaw*7,pitch*4); ctx.save(); ctx.translate(pose.gazeLX*7,pose.gazeLY*5); drawEye("left",pose.eyeL,pose.smile,yaw); ctx.restore(); ctx.save(); ctx.translate(pose.gazeRX*7,pose.gazeRY*5); drawEye("right",pose.eyeR,pose.smile,yaw); ctx.restore(); ctx.restore();
   const mouthVisual = advanceImageBaton(mouthBaton,mouthName(),.22,.7);
-  around(627,710,0,mouthVisual.sx,mouthVisual.sy,()=>drawLayer(mouthVisual.name));
+  ctx.save(); ctx.translate(yaw*12,pitch*7+pose.mouth*2); around(627,710,pose.roll*.025,mouthVisual.sx,mouthVisual.sy,()=>drawLayer(mouthVisual.name)); ctx.restore();
   drawFaceAccessory(ctx,{centerX:627,centerY:590,rotation:pose.roll*.18});
   ctx.restore(); ctx.restore();
 }
@@ -291,11 +340,11 @@ function previewFor(type,index) {
   canvas.className="asset-preview"; canvas.width=192; canvas.height=116;
   if(type==="eye") {
     const name=`eye-left-${expressionAssets.eye[index]}`;
-    g.drawImage(art[name],300,510,650,500,0,0,192,116);
+    drawLayerCrop(g,name,300,510,650,500,0,0,192,116);
   } else if(type==="brow") {
     g.save(); g.translate(96,58); g.rotate([-.055,0,.06][index]); g.translate(-96,-58);
-    g.drawImage(art["head-crease-left"],220,160,900,650,0,0,192,116); g.restore();
-  } else g.drawImage(art[expressionAssets.mouth[index]],520,700,1050,700,0,0,192,116);
+    drawLayerCrop(g,"head-crease-left",220,160,900,650,0,0,192,116); g.restore();
+  } else drawLayerCrop(g,expressionAssets.mouth[index],520,700,1050,700,0,0,192,116);
   return canvas;
 }
 let captureTarget=null;
@@ -340,7 +389,8 @@ $("importJson").onchange=async(event)=>{ try { const raw=JSON.parse(await event.
 addEventListener("keydown",(event)=>{ if(event.key==="F8"){ event.preventDefault(); const hidden=!$("exportAll").hidden; $("exportAll").hidden=hidden; $("exportJson").hidden=hidden; } });
 let last = -Infinity;
 function render(now) {
-  if (now-last > (document.hidden ? 100 : 0)) { last=now; if (!running && !obs) track(now); if (demo) send(now); for (const key in pose) pose[key] += (target[key]-pose[key]) * (key.startsWith("eye")||key==="mouth" ? .38 : key.startsWith("arm") ? .18 : key==="smile"||key==="brow" ? .24 : key.startsWith("gaze") ? .28 : .12); drawCharacter(now); $("mouthValue").textContent=`${Math.round(pose.mouth*100)}%`; $("gazeValue").textContent=pose.gazeX.toFixed(2); $("eyeValue").textContent=`${Math.round((pose.eyeL+pose.eyeR)*50)}%`; }
+  const frameInterval=document.hidden?100:obs?1000/30:running?1000/45:1000/30;
+  if (now-last > frameInterval) { last=now; if (!running && !obs) track(now); if (demo) send(now); for (const key in pose) pose[key] += (target[key]-pose[key]) * (key.startsWith("eye")||key==="mouth" ? .38 : key.startsWith("arm") ? .18 : key==="smile"||key==="brow" ? .24 : key.startsWith("gaze") ? .28 : .12); drawCharacter(now); $("mouthValue").textContent=`${Math.round(pose.mouth*100)}%`; $("gazeValue").textContent=pose.gazeX.toFixed(2); $("eyeValue").textContent=`${Math.round((pose.eyeL+pose.eyeR)*50)}%`; }
   requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
