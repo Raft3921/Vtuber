@@ -11,6 +11,12 @@ import { fileURLToPath } from "node:url";
 import ffmpegPath from "ffmpeg-static";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
+// Electron resolves the package entry from app.asar, while executable files
+// listed in asarUnpack physically live beside it in app.asar.unpacked. fs calls
+// understand ASAR paths, but child_process.spawn does not and returns ENOTDIR.
+const executableFfmpegPath = ffmpegPath.includes(".asar/")
+  ? ffmpegPath.replace(".asar/", ".asar.unpacked/")
+  : ffmpegPath;
 const httpPort = Number(process.env.VTUBER_PORT || 8777);
 const discoveryPort = Number(process.env.VTUBER_DISCOVERY_PORT || 47777);
 const instanceId = process.env.VTUBER_INSTANCE_ID || randomUUID();
@@ -70,7 +76,7 @@ export const server = http.createServer(async (req, res) => {
         await finished(writer);
         await new Promise((resolveConversion, rejectConversion) => {
           const args = ["-y", "-i", input, "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", output];
-          const process = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
+          const process = spawn(executableFfmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
           let errorText = "";
           process.stderr.on("data", chunk => { if (errorText.length < 8000) errorText += chunk; });
           process.on("error", rejectConversion);
