@@ -92,7 +92,7 @@ function track(now) {
   if(body?.length>=17){
     const torso=Math.max(.08,Math.hypot(body[11].x-body[12].x,body[11].y-body[12].y));
     const lift=(shoulder,wrist)=>clamp((shoulder.y-wrist.y)/torso+.58,-1,1);
-    // Naming is screen-relative: camera-right biological arm drives the screen-left artwork.
+    // Mirror behavior: the arm visible on the camera's left drives the artwork's left arm.
     const bend=(shoulder,elbow,wrist,mirror)=>{
       const upper=Math.atan2(elbow.y-shoulder.y,elbow.x-shoulder.x);
       const lower=Math.atan2(wrist.y-elbow.y,wrist.x-elbow.x);
@@ -101,8 +101,8 @@ function track(now) {
       while(delta< -Math.PI)delta+=Math.PI*2;
       return clamp(delta*mirror/1.25,-1,1);
     };
-    if((body[12].visibility??1)>.35&&(body[14].visibility??1)>.35&&(body[16].visibility??1)>.35){ target.armLeft=lift(body[12],body[16]); target.elbowLeft=bend(body[12],body[14],body[16],-1); }
-    if((body[11].visibility??1)>.35&&(body[13].visibility??1)>.35&&(body[15].visibility??1)>.35){ target.armRight=lift(body[11],body[15]); target.elbowRight=bend(body[11],body[13],body[15],1); }
+    if((body[11].visibility??1)>.35&&(body[13].visibility??1)>.35&&(body[15].visibility??1)>.35){ target.armLeft=lift(body[11],body[15]); target.elbowLeft=bend(body[11],body[13],body[15],-1); }
+    if((body[12].visibility??1)>.35&&(body[14].visibility??1)>.35&&(body[16].visibility??1)>.35){ target.armRight=lift(body[12],body[16]); target.elbowRight=bend(body[12],body[14],body[16],1); }
   } else { target.armLeft*=.92; target.armRight*=.92; target.elbowLeft*=.9; target.elbowRight*=.9; }
   const result = landmarker?.detectForVideo(video, now), lm = result?.faceLandmarks?.[0];
   if (!lm) { status("顔を探しています…"); return; }

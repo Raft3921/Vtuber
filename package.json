@@ -1,6 +1,6 @@
 {
   "name": "muzan-raft-vtuber-studio",
-  "version": "1.1.24",
+  "version": "1.1.25",
   "description": "Camera-tracked VTuber studio for OBS",
   "author": "Raft3921",
   "main": "bootstrap.cjs",
