@@ -19,7 +19,7 @@ document.querySelector("aside > p").textContent = "餃子の皮・3つの山・�
 
 const target = {
   x: 0, y: 0, roll: 0, yaw: 0, pitch: 0, depth: 0,
-  mouth: 0, eyeL: 1, eyeR: 1,
+  mouth: 0, mouthWide: 0, mouthPucker: 0, mouthTilt: 0, eyeL: 1, eyeR: 1,
   gazeX: 0, gazeY: 0, gazeLX: 0, gazeLY: 0, gazeRX: 0, gazeRY: 0,
   smile: 0, brow: 0, browL: 0, browR: 0,
   armLeft: 0, armRight: 0, elbowLeft: 0, elbowRight: 0,
@@ -33,7 +33,7 @@ const eyeBatons = {
   left: { current: "eye-left-open", to: "eye-left-open", queued: "eye-left-open", p: 1 },
   right: { current: "eye-right-open", to: "eye-right-open", queued: "eye-right-open", p: 1 },
 };
-const mouthBaton = { current: "mouth-closed", to: "mouth-closed", queued: "mouth-closed", p: 1 };
+const mouthBaton = { current: "mouth-closed", to: "mouth-closed", queued: "mouth-closed", candidate: "mouth-closed", candidateFrames: 0, p: 1 };
 
 function status(text) { $("status").textContent = text; }
 function clamp(v, a = 0, b = 1) { return Math.max(a, Math.min(b, v)); }
@@ -74,6 +74,7 @@ function track(now) {
     target.x = Math.sin(now * .0011) * .65; target.y = Math.sin(now * .0017) * .24;
     target.yaw = Math.sin(now * .00082) * .72; target.pitch = Math.sin(now * .00103) * .28; target.roll = Math.sin(now * .0013) * .14;
     target.depth = Math.sin(now * .0007) * .4; target.mouth = .5 + .5 * Math.sin(now * .0055);
+    target.mouthWide=.5+.5*Math.sin(now*.0031+.8); target.mouthPucker=.5+.5*Math.sin(now*.0027+2); target.mouthTilt=Math.sin(now*.0022)*.7;
     target.eyeL = .12 + .88 * Math.abs(Math.sin(now * .00165));
     target.eyeR = .12 + .88 * Math.abs(Math.sin(now * .00165 + .2));
     target.gazeLX = Math.sin(now * .002); target.gazeLY = Math.sin(now * .0016);
@@ -110,6 +111,9 @@ function track(now) {
   target.eyeL = clamp(1 - (s.eyeBlinkLeft || 0) * 1.65);
   target.eyeR = clamp(1 - (s.eyeBlinkRight || 0) * 1.65);
   target.mouth = clamp((s.jawOpen || 0) * 1.42 + (s.mouthFunnel || 0) * .62 + (s.mouthPucker || 0) * .34);
+  target.mouthWide=clamp(avg("mouthStretchLeft","mouthStretchRight")*1.35+avg("mouthSmileLeft","mouthSmileRight")*.35);
+  target.mouthPucker=clamp((s.mouthPucker||0)*1.25+(s.mouthFunnel||0)*.35);
+  target.mouthTilt=clamp(((s.mouthSmileRight||0)-(s.mouthSmileLeft||0))*1.2+((s.mouthFrownLeft||0)-(s.mouthFrownRight||0))*.8,-1,1);
   target.smile = clamp(avg("mouthSmileLeft", "mouthSmileRight") * 2.05 + avg("cheekSquintLeft", "cheekSquintRight") * .28);
   target.browL=clamp((s.browOuterUpLeft||0)*1.45+(s.browInnerUp||0)*1.15-(s.browDownLeft||0)*1.7,-1,1);
   target.browR=clamp((s.browOuterUpRight||0)*1.45+(s.browInnerUp||0)*1.15-(s.browDownRight||0)*1.7,-1,1);
@@ -306,6 +310,14 @@ function mouthName() {
   const fallback = pose.smile>.38 ? (pose.mouth>.24?5:4) : pose.brow<-.16&&pose.mouth<.3 ? 7 : pose.mouth>.72&&pose.eyeL>.75&&pose.eyeR>.75 ? 6 : pose.mouth>.54 ? 3 : pose.mouth>.31 ? 2 : pose.mouth>.07 ? 1 : 0;
   return expressionAssets.mouth[nearestProfile("mouth",fallback)];
 }
+function stableMouthName() {
+  const wanted=mouthName();
+  if(wanted===mouthBaton.to){ mouthBaton.candidate=wanted; mouthBaton.candidateFrames=0; return wanted; }
+  if(wanted!==mouthBaton.candidate){ mouthBaton.candidate=wanted; mouthBaton.candidateFrames=1; }
+  else mouthBaton.candidateFrames++;
+  // Fine deformation handles brief/small changes without swapping artwork.
+  return mouthBaton.candidateFrames>=5?wanted:mouthBaton.to;
+}
 function drawCharacter(now) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const idle = Math.sin(now*.0008), x = pose.x*48, y = pose.y*30-pose.depth*16+idle*2;
@@ -334,8 +346,14 @@ function drawCharacter(now) {
   ctx.save(); ctx.translate(0,-pose.browL*11); around(485,380,browShape-pose.browL*.07+pleatSpring*.012,1,1+Math.abs(pose.browL)*.025,()=>drawLayer("head-crease-left")); ctx.restore();
   ctx.save(); ctx.translate(0,-pose.browR*11); around(769,380,-browShape+pose.browR*.07-pleatSpring*.012,1,1+Math.abs(pose.browR)*.025,()=>drawLayer("head-crease-right")); ctx.restore();
   ctx.save(); ctx.translate(yaw*7,pitch*4); ctx.save(); ctx.translate(pose.gazeLX*7,pose.gazeLY*5); drawEye("left",pose.eyeL,pose.smile,yaw); ctx.restore(); ctx.save(); ctx.translate(pose.gazeRX*7,pose.gazeRY*5); drawEye("right",pose.eyeR,pose.smile,yaw); ctx.restore(); ctx.restore();
-  const mouthVisual = advanceImageBaton(mouthBaton,mouthName(),.29,.74);
-  ctx.save(); ctx.translate(yaw*12,pitch*7+pose.mouth*2); around(627,710,pose.roll*.025,mouthVisual.sx,mouthVisual.sy,()=>drawLayer(mouthVisual.name)); ctx.restore();
+  const mouthVisual = advanceImageBaton(mouthBaton,stableMouthName(),.29,.74);
+  const mouthIndex=Math.max(0,expressionAssets.mouth.indexOf(mouthVisual.name));
+  const baseline=Number(mapping.profiles.mouth[mouthIndex]?.mouth);
+  const openDelta=clamp(pose.mouth-(Number.isFinite(baseline)?baseline:[.03,.18,.38,.62,.04,.3,.82,.35][mouthIndex]),-.35,.35);
+  const fineX=clamp(1+pose.mouthWide*.055-pose.mouthPucker*.075,.91,1.07);
+  const fineY=clamp(1+openDelta*.34+pose.mouthPucker*.035,.9,1.13);
+  const fineRotation=pose.mouthTilt*.035;
+  ctx.save(); ctx.translate(yaw*12,pitch*7+pose.mouth*2); around(627,710,fineRotation+pose.roll*.025,mouthVisual.sx*fineX,mouthVisual.sy*fineY,()=>drawLayer(mouthVisual.name)); ctx.restore();
   drawFaceAccessory(ctx,{centerX:627,centerY:590,rotation:pose.roll*.18});
   ctx.restore(); ctx.restore();
 }
@@ -395,7 +413,7 @@ addEventListener("keydown",(event)=>{ if(event.key==="F8"){ event.preventDefault
 let last = -Infinity;
 function render(now) {
   const frameInterval=document.hidden?100:obs?1000/30:running?1000/45:1000/30;
-  if (now-last > frameInterval) { last=now; if (!running && !obs) track(now); if (demo) send(now); for (const key in pose) pose[key] += (target[key]-pose[key]) * (key.startsWith("eye")||key==="mouth" ? .38 : key.startsWith("arm") ? .18 : key==="smile"||key.startsWith("brow") ? .24 : key.startsWith("gaze") ? .28 : .12); drawCharacter(now); $("mouthValue").textContent=`${Math.round(pose.mouth*100)}%`; $("gazeValue").textContent=pose.gazeX.toFixed(2); $("eyeValue").textContent=`${Math.round((pose.eyeL+pose.eyeR)*50)}%`; }
+  if (now-last > frameInterval) { last=now; if (!running && !obs) track(now); if (demo) send(now); for (const key in pose) pose[key] += (target[key]-pose[key]) * (key.startsWith("eye")||key.startsWith("mouth") ? .38 : key.startsWith("arm") ? .18 : key==="smile"||key.startsWith("brow") ? .24 : key.startsWith("gaze") ? .28 : .12); drawCharacter(now); $("mouthValue").textContent=`${Math.round(pose.mouth*100)}%`; $("gazeValue").textContent=pose.gazeX.toFixed(2); $("eyeValue").textContent=`${Math.round((pose.eyeL+pose.eyeR)*50)}%`; }
   requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
