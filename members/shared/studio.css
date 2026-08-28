@@ -372,6 +372,9 @@ dialog::backdrop {
   height: 98vh;
   max-height: none;
 }
+.part-action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+.part-action-row button { margin: 0; }
+#deletePart { border-color: #e45656; color: #ffd4d4; }
 .adjust-card {
   display: flex;
   flex-direction: column;

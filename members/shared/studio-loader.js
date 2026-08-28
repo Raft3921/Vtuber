@@ -72,3 +72,9 @@ obsLinks.addEventListener("click", (event) => {
 });
 
 await import(avatar.module);
+
+addEventListener("keydown", (event) => {
+  if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z" || !document.querySelector("#adjuster")?.open) return;
+  event.preventDefault();
+  document.querySelector(event.shiftKey ? "#redoAdjust" : "#undoAdjust")?.click();
+});

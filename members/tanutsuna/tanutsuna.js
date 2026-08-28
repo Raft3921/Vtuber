@@ -11,6 +11,8 @@ import {
 } from "../shared/settings-ui.js";
 import { drawFaceAccessory } from "../shared/accessory-hotkeys.js";
 import { createDepthRig } from "../shared/depth-rig.js";
+import { extractNoseLayer } from "../shared/nose-layer.js";
+import { createAdjustmentHistory } from "../shared/adjustment-history.js";
 
 const $ = (id) => document.getElementById(id),
   canvas = $("stage"),
@@ -228,15 +230,7 @@ const irisPairs = [
     ),
   ],
   irisPairBounds = irisPairs.map(contentBounds);
-const baseNoNose = crop(art.base, 0, 0, 1254, 1254),
-  nosePart = crop(art.base, 602, 665, 50, 60);
-{
-  const g = baseNoNose.getContext("2d");
-  g.fillStyle = "#ffe1cf";
-  g.beginPath();
-  g.ellipse(627, 695, 18, 28, 0, 0, Math.PI * 2);
-  g.fill();
-}
+const { baseWithoutNose: baseNoNose, nose: nosePart } = extractNoseLayer(art.base, { x: 602, y: 665, width: 50, height: 60 });
 const skinMask = crop(baseNoNose, 0, 0, 1254, 1254),
   skinHighlight = document.createElement("canvas"),
   skinShadow = document.createElement("canvas");
@@ -314,13 +308,17 @@ const hairPartId = (index) => (index === 0 ? "ahoge" : `hair-${index}`),
     ]),
   ),
   normalizeHairAdjustments = (raw = {}) =>
-    Object.fromEntries(
+    ({
+      ...Object.fromEntries(
       Object.keys(defaultHairAdjustments).map((id) => [
         id,
         { ...defaultHairAdjustment, ...(raw[id] || {}) },
       ]),
-    );
+      ),
+      ...Object.fromEntries(Object.entries(raw).filter(([, value]) => Number.isInteger(value?.duplicateOf)).map(([id, value]) => [id, { ...defaultHairAdjustment, ...value }])),
+    });
 let hairAdjustments;
+let adjustmentHistory;
 try {
   hairAdjustments = normalizeHairAdjustments(
     JSON.parse(localStorage.getItem(HAIR_ADJUST_KEY) || "{}"),
@@ -329,8 +327,9 @@ try {
   hairAdjustments = structuredClone(defaultHairAdjustments);
 }
 const saveHairAdjustments = () => {
+  adjustmentHistory?.changed();
   localStorage.setItem(HAIR_ADJUST_KEY, JSON.stringify(hairAdjustments));
-  saveMapping();
+  saveMapping(true);
 };
 const hoodTipRegions = [
     [330, 840, 245, 245],
@@ -558,7 +557,8 @@ async function loadMapping() {
 }
 
 let saveTimer = 0;
-function saveMapping() {
+function saveMapping(skipHistory = false) {
+  if (!skipHistory) adjustmentHistory?.changed();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     fetch(`/settings?member=${member}`, {
@@ -570,6 +570,8 @@ function saveMapping() {
 }
 
 let mapping = await loadMapping();
+adjustmentHistory = createAdjustmentHistory(() => ({ mapping, hairAdjustments }), (state) => { mapping = state.mapping; hairAdjustments = state.hairAdjustments; localStorage.setItem(HAIR_ADJUST_KEY, JSON.stringify(hairAdjustments)); saveMapping(true); buildAdjuster(); }, updateHistoryButtons);
+function updateHistoryButtons(state = adjustmentHistory?.availability() || {}) { $("undoAdjust").disabled = !state.canUndo; $("redoAdjust").disabled = !state.canRedo; }
 const target = {
     x: 0,
     y: 0,
@@ -1189,9 +1191,13 @@ function drawFlexSprite(atlas, def, bend, x, y) {
     );
   }
 }
-function drawAdjustedHair(index, x, y) {
+const hairInstances = () => [
+  ...assembledHair.map((_, index) => ({ id: hairPartId(index), index })),
+  ...Object.entries(hairAdjustments).filter(([, value]) => Number.isInteger(value?.duplicateOf)).map(([id, value]) => ({ id, index: value.duplicateOf })),
+].filter((instance) => !hairAdjustments[instance.id]?.deleted);
+function drawAdjustedHair(id, index, x, y) {
   const def = assembledHair[index],
-    adjustment = hairAdjustments[hairPartId(index)] || defaultHairAdjustment,
+    adjustment = hairAdjustments[id] || defaultHairAdjustment,
     [dx, dy, dw] = def.dst,
     pivotX = dx + dw / 2 + x,
     pivotY = dy + y;
@@ -1207,20 +1213,19 @@ function drawAdjustedHair(index, x, y) {
   ctx.restore();
 }
 function drawAdjustedHairLayer(front, x, y) {
-  const order = assembledHair
-    .map((_, i) => i)
-    .filter((i) =>
+  const order = hairInstances()
+    .filter((instance) =>
       front
-        ? (Number(hairAdjustments[hairPartId(i)]?.layer) || 0) >= 0
-        : (Number(hairAdjustments[hairPartId(i)]?.layer) || 0) < 0,
+        ? (Number(hairAdjustments[instance.id]?.layer) || 0) >= 0
+        : (Number(hairAdjustments[instance.id]?.layer) || 0) < 0,
     )
     .sort(
       (a, b) =>
-        (Number(hairAdjustments[hairPartId(a)]?.layer) || 0) -
-          (Number(hairAdjustments[hairPartId(b)]?.layer) || 0) ||
-        a - b,
+        (Number(hairAdjustments[a.id]?.layer) || 0) -
+          (Number(hairAdjustments[b.id]?.layer) || 0) ||
+        a.index - b.index,
     );
-  for (const i of order) drawAdjustedHair(i, x, y);
+  for (const instance of order) drawAdjustedHair(instance.id, instance.index, x, y);
 }
 function drawBackHair(x, y) {
   ctx.save();
@@ -1388,8 +1393,8 @@ function render(now) {
   ctx.scale(fit * (1 + breath * 0.0025) * depth3d.squashX, fit * (1 + breath * 0.006) * depth3d.stretchY);
   ctx.rotate(rot * 0.55);
   ctx.translate(-627, -1190);
-  outlinedLayer(() => drawBackHair(x, y));
-  outlinedLayer(() => drawAdjustedHairLayer(false, x, y));
+  outlinedLayer(() => drawBackHair(x + depth3d.backX, y + depth3d.backY));
+  outlinedLayer(() => drawAdjustedHairLayer(false, x + depth3d.backX, y + depth3d.backY));
   outlinedLayer(() => {
     const bodyY = y + sway.neck * 7;
     draw(baseNoNose, x, bodyY);
@@ -1406,33 +1411,34 @@ function render(now) {
   outlinedLayer(() => {
     ctx.save();
     ctx.translate(
-      627 + x + mapping.layout.noseX,
-      695 + y + mapping.layout.noseY,
+      627 + x + depth3d.faceX + depth3d.yaw * 5 + mapping.layout.noseX,
+      695 + y + depth3d.faceY + mapping.layout.noseY,
     );
-    ctx.rotate((mapping.layout.noseRotation * Math.PI) / 180);
-    ctx.scale(mapping.layout.noseScale, mapping.layout.noseScale);
+    ctx.rotate((mapping.layout.noseRotation * Math.PI) / 180 - depth3d.yaw * .04);
+    ctx.scale(mapping.layout.noseScale * (1 - Math.abs(depth3d.yaw) * .13), mapping.layout.noseScale * (1 + depth3d.pitch * .035));
     ctx.drawImage(nosePart, -25, -30);
     ctx.restore();
-    drawBlinkAsset(mapping.eye[blinkFrame], x, y);
+    const faceX = x + depth3d.faceX, faceY = y + depth3d.faceY;
+    drawBlinkAsset(mapping.eye[blinkFrame], faceX, faceY);
     const browVisual = advanceBaton(browBaton, nearest("brow", browState()));
-    drawBrows(mapping.brow[browVisual.index], x, y);
+    drawBrows(mapping.brow[browVisual.index], faceX, faceY);
     const mouthVisual = advanceMouthBaton(nearestMouth()),
       mouthInfo = mouthAssetInfo(mouthVisual.index);
     drawMouthFixed(
       mouthInfo,
-      627 + x,
-      756 + y + mapping.layout.mouthY,
+      627 + faceX,
+      756 + faceY + mapping.layout.mouthY,
       mouthVisual.sx,
       mouthVisual.sy,
     );
     drawFaceAccessory(ctx, {
-      centerX: 627 + x,
-      centerY: 627 + y,
+      centerX: 627 + faceX,
+      centerY: 627 + faceY,
       rotation: pose.roll * 0.12,
     });
   });
   outlinedLayer(() => {
-    drawAdjustedHairLayer(true, x, y);
+    drawAdjustedHairLayer(true, x + depth3d.frontX, y + depth3d.frontY);
   });
   ctx.restore();
   depthRig.drawLighting(characterCtx, characterCanvas, depth3d.yaw, depth3d.pitch);
@@ -1685,6 +1691,11 @@ function buildAdjuster() {
   const list = $("partList"),
     sliders = $("partSliders");
   list.replaceChildren();
+  for (const [id, value] of Object.entries(hairAdjustments)) {
+    if (!Number.isInteger(value?.duplicateOf)) continue;
+    adjustmentGroups[`__${id}`] = { label: value.duplicateLabel || `髪の毛 ${value.duplicateOf} のコピー`, source: "hair", hairId: id, controls: hairControls };
+  }
+  const duplicateIds = Object.keys(hairAdjustments).filter((id) => Number.isInteger(hairAdjustments[id]?.duplicateOf) && !hairAdjustments[id]?.deleted).map((id) => `__${id}`);
   const sections = [
     ["顔", ["__eye", "__iris", "__brow", "__nose", "__mouth"]],
     [
@@ -1693,6 +1704,7 @@ function buildAdjuster() {
         "__hair",
         "__ahoge",
         ...Array.from({ length: 7 }, (_, i) => `__hair${i + 1}`),
+        ...duplicateIds,
       ],
     ],
     ["動き", ["__ears", "__cloth"]],
@@ -1721,6 +1733,8 @@ function buildAdjuster() {
           : mapping.visual,
     save = def.source === "hair" ? saveHairAdjustments : saveMapping;
   $("selectedPartName").textContent = def.label;
+  $("duplicatePart").hidden = def.source !== "hair";
+  $("deletePart").hidden = def.source !== "hair"; $("hairActions").hidden = def.source !== "hair"; updateHistoryButtons();
   if (def.source === "hair") makeAdjustAspectToggle(sliders, source, save);
   for (const [key, label, min, max, step] of def.controls) {
     if (def.source === "hair" && source.lockAspect !== false && (key === "scaleX" || key === "scaleY")) continue;
@@ -1810,6 +1824,20 @@ $("openAdjuster").onclick = () => {
   buildAdjuster();
   adjuster.showModal();
 };
+$("duplicatePart").onclick = () => {
+  const def = adjustmentGroups[selectedAdjustPart];
+  if (def?.source !== "hair") return;
+  const source = hairAdjustments[def.hairId], sourceIndex = Number.isInteger(source?.duplicateOf) ? source.duplicateOf : def.hairId === "ahoge" ? 0 : Number(def.hairId.split("-")[1]);
+  let serial = 1, id;
+  do id = `hair-${sourceIndex}-copy-${serial++}`; while (hairAdjustments[id]);
+  hairAdjustments[id] = { ...defaultHairAdjustment, ...source, x: (Number(source.x) || 0) + 24, y: (Number(source.y) || 0) + 18, duplicateOf: sourceIndex, duplicateLabel: `${def.label.replace(/ のコピー(?: \d+)?$/, "")} のコピー ${serial - 1}` };
+  selectedAdjustPart = `__${id}`; adjustHighlightUntil = performance.now() + 1400;
+  saveHairAdjustments(); buildAdjuster();
+};
+$("movePartBack").onclick = () => { const def=adjustmentGroups[selectedAdjustPart], v=def?.source==="hair"?hairAdjustments[def.hairId]:null; if(v){v.layer=Math.max(-20,(Number(v.layer)||0)-1);saveHairAdjustments();buildAdjuster();} };
+$("movePartFront").onclick = () => { const def=adjustmentGroups[selectedAdjustPart], v=def?.source==="hair"?hairAdjustments[def.hairId]:null; if(v){v.layer=Math.min(20,(Number(v.layer)||0)+1);saveHairAdjustments();buildAdjuster();} };
+$("deletePart").onclick = () => { const def=adjustmentGroups[selectedAdjustPart], v=def?.source==="hair"?hairAdjustments[def.hairId]:null; if(!v)return; v.deleted=true; selectedAdjustPart="__hair"; saveHairAdjustments();buildAdjuster(); };
+$("undoAdjust").onclick = () => adjustmentHistory.undo(); $("redoAdjust").onclick = () => adjustmentHistory.redo();
 $("resetPart").onclick = () => {
   const def = adjustmentGroups[selectedAdjustPart],
     source =

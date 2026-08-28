@@ -207,7 +207,7 @@
   },
   "hairAdjustments": {
     "back-left": {
-      "x": 0,
+      "x": 1,
       "y": 0,
       "scale": 1,
       "lockAspect": true,
@@ -218,7 +218,7 @@
       "sway": 2.4
     },
     "back-center": {
-      "x": -29,
+      "x": -42,
       "y": 36,
       "scale": 0.94,
       "lockAspect": true,
@@ -229,7 +229,7 @@
       "sway": 2.4
     },
     "back-right": {
-      "x": -54,
+      "x": -57,
       "y": -54,
       "scale": 0.9,
       "lockAspect": true,
@@ -240,7 +240,7 @@
       "sway": 3
     },
     "upper-left": {
-      "x": 29,
+      "x": 24,
       "y": 51,
       "scale": 1.18,
       "lockAspect": true,
@@ -251,7 +251,7 @@
       "sway": 3
     },
     "upper-center": {
-      "x": -22,
+      "x": -59,
       "y": 70,
       "scale": 1.65,
       "lockAspect": true,
@@ -262,7 +262,7 @@
       "sway": 3
     },
     "upper-right": {
-      "x": -97,
+      "x": -93,
       "y": 45,
       "scale": 1.09,
       "lockAspect": true,
@@ -273,7 +273,7 @@
       "sway": 2.25
     },
     "front-left": {
-      "x": 0,
+      "x": -17,
       "y": 27,
       "scale": 1,
       "lockAspect": true,
@@ -284,7 +284,7 @@
       "sway": 3
     },
     "front-center": {
-      "x": -53,
+      "x": -51,
       "y": -4,
       "scale": 1.07,
       "lockAspect": true,
@@ -295,7 +295,7 @@
       "sway": 3
     },
     "front-right": {
-      "x": -93,
+      "x": -92,
       "y": 24,
       "scale": 0.93,
       "lockAspect": true,
@@ -304,6 +304,115 @@
       "layer": 0,
       "rotation": 8,
       "sway": 3
+    },
+    "upper-left-copy-1": {
+      "x": -20,
+      "y": 129,
+      "scale": 1.05,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": -4,
+      "rotation": -17.5,
+      "sway": 3,
+      "duplicateOf": "upper-left",
+      "duplicateLabel": "上の髪 左 のコピー 1"
+    },
+    "front-left-copy-1": {
+      "x": 39,
+      "y": 6,
+      "scale": 1,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 0,
+      "sway": 3,
+      "duplicateOf": "front-left",
+      "duplicateLabel": "前髪 左 のコピー 1",
+      "deleted": true
+    },
+    "upper-left-copy-2": {
+      "x": 48,
+      "y": 69,
+      "scale": 1.18,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": -13,
+      "sway": 3,
+      "duplicateOf": "upper-left",
+      "duplicateLabel": "上の髪 左 のコピー 2",
+      "deleted": true
+    },
+    "upper-center-copy-1": {
+      "x": 35,
+      "y": 62,
+      "scale": 1.38,
+      "lockAspect": false,
+      "scaleX": 1,
+      "scaleY": 1.13,
+      "layer": -3,
+      "rotation": 0,
+      "sway": 3,
+      "duplicateOf": "upper-center",
+      "duplicateLabel": "上の髪 中央 のコピー 1"
+    },
+    "upper-left-copy-3": {
+      "x": 220,
+      "y": 16,
+      "scale": 1.53,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 45,
+      "sway": 3,
+      "duplicateOf": "upper-left",
+      "duplicateLabel": "上の髪 左 のコピー 3",
+      "deleted": true
+    },
+    "upper-right-copy-1": {
+      "x": -117,
+      "y": 96,
+      "scale": 0.95,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 42.5,
+      "sway": 2.25,
+      "duplicateOf": "upper-right",
+      "duplicateLabel": "上の髪 右 のコピー 1"
+    },
+    "upper-right-copy-2": {
+      "x": -220,
+      "y": 114,
+      "scale": 0.95,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": 42.5,
+      "sway": 2.25,
+      "duplicateOf": "upper-right",
+      "duplicateLabel": "上の髪 右 のコピー 2",
+      "deleted": true
+    },
+    "upper-center-copy-2": {
+      "x": -164,
+      "y": 88,
+      "scale": 1.23,
+      "lockAspect": true,
+      "scaleX": 1,
+      "scaleY": 1,
+      "layer": 0,
+      "rotation": -30,
+      "sway": 3,
+      "duplicateOf": "upper-center",
+      "duplicateLabel": "上の髪 中央 のコピー 2",
+      "deleted": true
     }
   }
 }

@@ -252,6 +252,19 @@
       "layer": 0,
       "rotation": 0,
       "sway": 3
+    },
+    "upper-generated-copy-1": {
+      "x": -29,
+      "y": -76,
+      "scale": 0.71,
+      "lockAspect": false,
+      "scaleX": 0.97,
+      "scaleY": 1,
+      "layer": -3,
+      "rotation": 0,
+      "sway": 2.35,
+      "duplicateOf": "upper-generated",
+      "duplicateLabel": "上の髪 のコピー 1"
     }
   }
 }

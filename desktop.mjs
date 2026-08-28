@@ -536,6 +536,14 @@ await createMainWindow();
 makeTray();
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
+// Local arm64 directory builds can omit Resources/app-update.yml. Configure
+// the public GitHub feed in code as well so an already-installed affected build
+// can still check and download the next published release.
+autoUpdater.setFeedURL({
+  provider: "github",
+  owner: "Raft3921",
+  repo: "Vtuber",
+});
 autoUpdater.on("update-not-available", async () => {
   if (!updateCheckInProgress) return;
   updateCheckInProgress = false;

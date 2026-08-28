@@ -60,6 +60,16 @@
           <aside class="part-controls">
             <h3 id="selectedPartName">部位を選択</h3>
             <div id="partSliders"></div>
+            <div class="part-action-row">
+              <button type="button" id="undoAdjust" disabled>↶ Undo</button>
+              <button type="button" id="redoAdjust" disabled>↷ Redo</button>
+            </div>
+            <div class="part-action-row hair-actions" id="hairActions" hidden>
+              <button type="button" id="movePartBack">奥へ</button>
+              <button type="button" id="movePartFront">手前へ</button>
+            </div>
+            <button type="button" id="duplicatePart" hidden>選択した髪を複製</button>
+            <button type="button" id="deletePart" hidden>選択した髪を削除</button>
             <button type="button" id="resetPart">この部位を初期値へ</button>
           </aside>
         </div>

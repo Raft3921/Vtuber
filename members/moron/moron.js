@@ -11,6 +11,9 @@ import {
 } from "../shared/settings-ui.js";
 import { drawFaceAccessory } from "../shared/accessory-hotkeys.js";
 import { createDepthRig } from "../shared/depth-rig.js";
+import { extractNoseLayer } from "../shared/nose-layer.js";
+import { duplicateHairPart, restoreHairDuplicates } from "../shared/hair-duplicates.js";
+import { createAdjustmentHistory } from "../shared/adjustment-history.js";
 
 const $ = (id) => document.getElementById(id),
   canvas = $("stage"),
@@ -164,7 +167,7 @@ const defaultHairAdjustment = () => ({
 const makeDefaultHairAdjustments = () =>
   Object.fromEntries(hairPieceDefs.map((p) => [p.id, defaultHairAdjustment()]));
 let hairAdjustments = makeDefaultHairAdjustments(),
-  selectedHairId = "front-center",
+  selectedHairId = "front-generated",
   highlightUntil = 0;
 const defaultForeheadEyes = {
   x: 0,
@@ -175,7 +178,7 @@ const defaultForeheadEyes = {
 };
 let foreheadEyes = { ...defaultForeheadEyes };
 
-const hairHitImages = hairPieceDefs.map((p, index) => {
+const makeHairHitImage = (p, index) => {
   const c = document.createElement("canvas");
   c.width = p.img.width;
   c.height = p.img.height;
@@ -185,7 +188,8 @@ const hairHitImages = hairPieceDefs.map((p, index) => {
   g.fillStyle = `rgb(${index + 1},0,0)`;
   g.fillRect(0, 0, c.width, c.height);
   return c;
-});
+};
+const hairHitImages = hairPieceDefs.map(makeHairHitImage);
 const crop = (img, x, y, w, h) => {
   const c = document.createElement("canvas");
   c.width = Math.round(w);
@@ -310,15 +314,7 @@ const irisPairs = [
     ),
   ],
   irisPairBounds = irisPairs.map(contentBounds);
-const baseNoNose = crop(art.base, 0, 0, 1254, 1254),
-  nosePart = crop(art.base, 602, 665, 50, 60);
-{
-  const g = baseNoNose.getContext("2d");
-  g.fillStyle = "#ffe1cf";
-  g.beginPath();
-  g.ellipse(627, 695, 18, 28, 0, 0, Math.PI * 2);
-  g.fill();
-}
+const { baseWithoutNose: baseNoNose, nose: nosePart } = extractNoseLayer(art.base, { x: 602, y: 665, width: 50, height: 60 });
 const skinMask = crop(baseNoNose, 0, 0, 1254, 1254),
   skinHighlight = document.createElement("canvas"),
   skinShadow = document.createElement("canvas");
@@ -426,6 +422,7 @@ async function loadAllSettings() {
     visual: { ...defaultVisual, ...next.visual },
   };
 
+  restoreHairDuplicates(raw.hairAdjustments, hairPieceDefs, hairPieceMotion, hairHitImages, makeHairHitImage);
   const loadedHair = Object.fromEntries(
     hairPieceDefs.map((p) => [
       p.id,
@@ -479,11 +476,15 @@ function saveAllSettings() {
   }, 120);
 }
 function saveMapping() {
+  adjustmentHistory?.changed();
   saveAllSettings();
 }
 function saveHairAdjustments() {
+  adjustmentHistory?.changed();
   saveAllSettings();
 }
+let adjustmentHistory = createAdjustmentHistory(() => ({ mapping, hairAdjustments }), (state) => { mapping = state.mapping; hairAdjustments = state.hairAdjustments; saveAllSettings(); buildAdjuster(); }, updateHistoryButtons);
+function updateHistoryButtons(state = adjustmentHistory?.availability() || {}) { $("undoAdjust").disabled = !state.canUndo; $("redoAdjust").disabled = !state.canRedo; }
 const target = {
     x: 0,
     y: 0,
@@ -1101,7 +1102,7 @@ function drawFlexSprite(atlas, def, bend, x, y) {
   }
 }
 function drawHairGroup(group, x, y, now, hit = false) {
-  const ordered = hairPieceDefs.map((_, i) => i).filter((i) => { const p = hairPieceDefs[i], layer = Number(hairAdjustments[p.id].layer) || 0; return (layer < 0 ? "back" : layer > 0 ? "front" : p.group) === group; }).sort((a, b) => (Number(hairAdjustments[hairPieceDefs[a].id].layer) || 0) - (Number(hairAdjustments[hairPieceDefs[b].id].layer) || 0) || a - b);
+  const ordered = hairPieceDefs.map((_, i) => i).filter((i) => { const p = hairPieceDefs[i]; if (hairAdjustments[p.id]?.deleted) return false; const layer = Number(hairAdjustments[p.id].layer) || 0; return (layer < 0 ? "back" : layer > 0 ? "front" : p.group) === group; }).sort((a, b) => (Number(hairAdjustments[hairPieceDefs[a].id].layer) || 0) - (Number(hairAdjustments[hairPieceDefs[b].id].layer) || 0) || a - b);
   for (const i of ordered) {
     const p = hairPieceDefs[i];
     const groupY = p.group === "front" ? 28 : 0,
@@ -1392,7 +1393,7 @@ function render(now) {
   ctx.scale(outerScaleX, outerScaleY);
   ctx.rotate(rot * 0.55);
   ctx.translate(-627, -1190);
-  outlinedLayer(() => drawBackHair(x, y, now));
+  outlinedLayer(() => drawBackHair(x + depth3d.backX, y + depth3d.backY, now));
   outlinedLayer(() => {
     const bodyY = y + sway.neck * 7;
     draw(baseNoNose, x, bodyY);
@@ -1401,35 +1402,36 @@ function render(now) {
   outlinedLayer(() => {
     ctx.save();
     ctx.translate(
-      627 + x + mapping.layout.noseX,
-      695 + y + mapping.layout.noseY,
+      627 + x + depth3d.faceX + depth3d.yaw * 5 + mapping.layout.noseX,
+      695 + y + depth3d.faceY + mapping.layout.noseY,
     );
-    ctx.rotate((mapping.layout.noseRotation * Math.PI) / 180);
-    ctx.scale(mapping.layout.noseScale, mapping.layout.noseScale);
+    ctx.rotate((mapping.layout.noseRotation * Math.PI) / 180 - depth3d.yaw * .04);
+    ctx.scale(mapping.layout.noseScale * (1 - Math.abs(depth3d.yaw) * .13), mapping.layout.noseScale * (1 + depth3d.pitch * .035));
     ctx.drawImage(nosePart, -25, -30);
     ctx.restore();
-    drawBlinkAsset(mapping.eye[blinkFrame], x, y);
+    const faceX = x + depth3d.faceX, faceY = y + depth3d.faceY;
+    drawBlinkAsset(mapping.eye[blinkFrame], faceX, faceY);
     const browVisual = advanceBaton(browBaton, nearest("brow", browState()));
-    drawBrows(mapping.brow[browVisual.index], x, y);
+    drawBrows(mapping.brow[browVisual.index], faceX, faceY);
     const mouthVisual = advanceMouthBaton(nearestMouth()),
       mouthInfo = mouthAssetInfo(mouthVisual.index);
     drawMouthFixed(
       mouthInfo,
-      627 + x,
-      756 + y + mapping.layout.mouthY,
+      627 + faceX,
+      756 + faceY + mapping.layout.mouthY,
       mouthVisual.sx,
       mouthVisual.sy,
     );
     drawFaceAccessory(ctx, {
-      centerX: 627 + x,
-      centerY: 627 + y,
+      centerX: 627 + faceX,
+      centerY: 627 + faceY,
       rotation: pose.roll * 0.12,
     });
   });
   outlinedLayer(() => {
-    drawHairGroup("upper", x, y, now);
+    drawHairGroup("upper", x + depth3d.frontX, y + depth3d.frontY, now);
     drawForeheadEyes(blinkFrame, x, y);
-    drawHairGroup("front", x, y, now);
+    drawHairGroup("front", x + depth3d.frontX, y + depth3d.frontY, now);
   });
   ctx.restore();
   depthRig.drawLighting(characterCtx, characterCanvas, depth3d.yaw, depth3d.pitch);
@@ -1695,7 +1697,7 @@ function buildAdjuster() {
       group
     ];
     list.append(title);
-    for (const p of hairPieceDefs.filter((v) => v.group === group)) {
+    for (const p of hairPieceDefs.filter((v) => v.group === group && !hairAdjustments[v.id]?.deleted)) {
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = p.label;
@@ -1705,6 +1707,8 @@ function buildAdjuster() {
     }
   }
   controls.replaceChildren();
+  $("duplicatePart").hidden = !hairAdjustments[selectedHairId];
+  $("deletePart").hidden = !hairAdjustments[selectedHairId]; $("hairActions").hidden = !hairAdjustments[selectedHairId]; updateHistoryButtons();
   if (facePartDefs[selectedHairId]) {
     const def = facePartDefs[selectedHairId],
       source = def.source ? def.source() : def.visual ? mapping.visual : mapping.layout;
@@ -1813,11 +1817,21 @@ $("openAdjuster").onclick = () => {
     !facePartDefs[selectedHairId] &&
     selectedHairId !== "__visual"
   )
-    selectedHairId = "front-center";
+    selectedHairId = "front-generated";
   buildAdjuster();
   highlightUntil = performance.now() + 1100;
   $("adjuster").showModal();
 };
+$("duplicatePart").onclick = () => {
+  const id = duplicateHairPart(selectedHairId, hairPieceDefs, hairPieceMotion, hairHitImages, makeHairHitImage, hairAdjustments, defaultHairAdjustment);
+  if (!id) return;
+  selectedHairId = id; highlightUntil = performance.now() + 1400;
+  saveHairAdjustments(); buildAdjuster();
+};
+$("movePartBack").onclick = () => { const v=hairAdjustments[selectedHairId]; if(v){ v.layer=Math.max(-20,(Number(v.layer)||0)-1); saveHairAdjustments(); buildAdjuster(); } };
+$("movePartFront").onclick = () => { const v=hairAdjustments[selectedHairId]; if(v){ v.layer=Math.min(20,(Number(v.layer)||0)+1); saveHairAdjustments(); buildAdjuster(); } };
+$("deletePart").onclick = () => { const v=hairAdjustments[selectedHairId]; if(!v)return; v.deleted=true; selectedHairId=hairPieceDefs.find(p=>!hairAdjustments[p.id]?.deleted)?.id || "__visual"; saveHairAdjustments(); buildAdjuster(); };
+$("undoAdjust").onclick = () => adjustmentHistory.undo(); $("redoAdjust").onclick = () => adjustmentHistory.redo();
 $("resetPart").onclick = () => {
   if (hairAdjustments[selectedHairId]) {
     hairAdjustments[selectedHairId] = defaultHairAdjustment();
@@ -1870,6 +1884,7 @@ $("importJson").onchange = async (e) => {
     };
     foreheadEyes = { ...defaultForeheadEyes, ...(raw.foreheadEyes || {}) };
     if (raw.hairAdjustments) {
+      restoreHairDuplicates(raw.hairAdjustments, hairPieceDefs, hairPieceMotion, hairHitImages, makeHairHitImage);
       hairAdjustments = Object.fromEntries(
         hairPieceDefs.map((p) => [
           p.id,
