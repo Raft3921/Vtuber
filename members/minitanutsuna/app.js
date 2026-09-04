@@ -212,7 +212,8 @@ function render(now) {
   if (demo) {
     target.x = Math.sin(now * 0.0011) * 0.55;
     target.y = Math.sin(now * 0.0017) * 0.2;
-    target.roll = Math.sin(now * 0.0013) * 0.19;
+    // 実カメラで大きく傾いた場合と同じ最大角まで安全に確認する。
+    target.roll = Math.sin(now * 0.0013) * 0.6;
     target.depth = Math.sin(now * 0.0008) * 0.35;
     target.eyeOpen = 0.7 + Math.sin(now * 0.0032) * 0.65;
     target.mouthOpen = Math.max(0, Math.sin(now * 0.006));
@@ -228,9 +229,13 @@ function render(now) {
   const scale = config.sizeAmount / 100;
   const bodyX = pose.bodyX * 10;
   const bodyY = pose.bodyY * 7 + pose.depth * 4;
-  const headX = pose.x * 24;
-  const headY = pose.y * 14 - pose.depth * 8;
-  const headRotation = pose.roll * (config.rotationAmount / 100);
+  // 頭だけが胴体から離れないよう、胴体移動を基準に小さな差分だけ加える。
+  const headX = bodyX + pose.x * 7;
+  const headY = bodyY + pose.y * 4 - pose.depth * 5;
+  const headRotation = Math.max(
+    -0.28,
+    Math.min(0.28, pose.roll * 0.48 * (config.rotationAmount / 72)),
+  );
   const wantedExpression = demo ? Math.floor(now / 900) % expressions.length : nearestExpression(0);
   if (wantedExpression === pendingExpression) pendingFrames++;
   else { pendingExpression = wantedExpression; pendingFrames = 1; }
@@ -242,9 +247,10 @@ function render(now) {
   drawFull(images.body);
   ctx.restore();
 
-  // 4096px原画の首中心(2048, 1900)を、1000pxキャンバスの回転軸に変換。
+  // 顎と首が接する位置を回転軸にする。首の下側を軸にすると、
+  // 顔を傾けた時に顎が大きく横へ逃げて首が伸びて見える。
   const neckX = 500;
-  const neckY = 464;
+  const neckY = 421;
   ctx.save();
   ctx.translate(500 + headX, 500 + headY);
   ctx.scale(scale, scale);
