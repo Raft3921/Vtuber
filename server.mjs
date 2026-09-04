@@ -3,7 +3,7 @@ import dgram from "node:dgram";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { readFile, writeFile, mkdir, stat, rm } from "node:fs/promises";
+import { readFile, writeFile, mkdir, stat, rm, open } from "node:fs/promises";
 import { finished } from "node:stream/promises";
 import { spawn } from "node:child_process";
 import { extname, join, normalize, relative, resolve } from "node:path";
@@ -31,11 +31,13 @@ const memberConfigFiles = {
   "5": "muto-all-settings.json",
   "6": "moron-all-settings.json",
   "8": "gyoza-all-settings.json",
+  "9": "minitanutsuna-all-settings.json",
 };
 const configFileForMember = (member) =>
   memberConfigFiles[member] || `member-${member}-all-settings.json`;
 
 const weekRoot = join(root, "members", "week");
+const miniTanutsunaRoot = join(root, "members", "minitanutsuna");
 const clients = new Map(),
   latest = new Map(),
   latestAt = new Map(),
@@ -74,6 +76,10 @@ export const server = http.createServer(async (req, res) => {
         const writer = createWriteStream(input);
         req.pipe(writer);
         await finished(writer);
+        const inputInfo = await stat(input), handle = await open(input, "r"), header = Buffer.alloc(4);
+        try { await handle.read(header, 0, 4, 0); } finally { await handle.close(); }
+        if (inputInfo.size < 64 || !header.equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])))
+          throw new Error(`受信した録画データがWebMとして不完全です（${inputInfo.size} bytes / header ${header.toString("hex") || "none"}）`);
         await new Promise((resolveConversion, rejectConversion) => {
           const args = ["-y", "-i", input, "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", output];
           const process = spawn(executableFfmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
@@ -178,7 +184,11 @@ export const server = http.createServer(async (req, res) => {
     }
     let base = root,
       pathname = url.pathname;
-    if (pathname.startsWith("/week/")) {
+    if (pathname.startsWith("/minitanutsuna/")) {
+      base = miniTanutsunaRoot;
+      pathname = pathname.slice("/minitanutsuna".length);
+      if (pathname === "/") pathname = "/index.html";
+    } else if (pathname.startsWith("/week/")) {
       base = weekRoot;
       pathname = pathname.slice("/week".length);
       if (pathname === "/") pathname = "/index.html";

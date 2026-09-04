@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ミニたぬつな・ライブ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <section class="stage-wrap">
+      <canvas id="stage" width="1000" height="1000" aria-label="ミニたぬつなのプレビュー"></canvas>
+      <span id="status">待機中</span>
+    </section>
+    <aside>
+      <h1>No.9 ミニたぬつな</h1>
+      <p>頭は首の中心で回転し、顔の傾きに追従します。</p>
+      <button id="start">カメラを開始</button>
+      <button id="demo" class="secondary">動きテスト</button>
+      <button id="full" class="secondary">全画面</button>
+      <button id="openMapper" class="secondary">顔と表情を設定</button>
+      <label>首の回転量 <input id="rotationAmount" type="range" min="0" max="100" value="72"><output>72</output></label>
+      <label>追従のなめらかさ <input id="smoothAmount" type="range" min="40" max="96" value="82"><output>82</output></label>
+      <label>大きさ <input id="sizeAmount" type="range" min="55" max="112" value="94"><output>94</output></label>
+      <div class="expressions"><strong id="expressionState">表情を読み込み中</strong><small>MediaPipe Face Landmarkerが顔特徴を取得し、登録した顔に最も近い表情を選びます。</small></div>
+      <div id="obsLinks"></div>
+    </aside>
+  </main>
+  <dialog id="mapper">
+    <form method="dialog" class="mapper-card">
+      <header><div><h2>顔と表情を設定</h2><p>各画像に、その表情を出したい実際の顔を登録します。</p></div><button value="cancel" class="secondary close">閉じる</button></header>
+      <section id="capturePanel" hidden><video id="capturePreview" playsinline muted></video><div><strong id="captureTitle"></strong><p>顔を作ったまま決定すると、目・眉・口などの特徴が保存されます。</p><button type="button" id="commitFace">この顔で決定</button><button type="button" id="cancelCapture" class="secondary">キャンセル</button></div></section>
+      <div id="mappingTables"></div>
+      <footer><button type="button" id="resetMapping" class="secondary">顔の登録をすべて解除</button></footer>
+    </form>
+  </dialog>
+  <video id="camera" playsinline muted></video>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

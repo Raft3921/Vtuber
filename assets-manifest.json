@@ -72,6 +72,20 @@
     "members/week/left_eye.png",
     "members/week/right_eye.png"
   ],
+  "minitanutsuna": [
+    "members/minitanutsuna/body.png",
+    "members/minitanutsuna/head.png",
+    "members/minitanutsuna/expressions/expression-01.png",
+    "members/minitanutsuna/expressions/expression-02.png",
+    "members/minitanutsuna/expressions/expression-03.png",
+    "members/minitanutsuna/expressions/expression-04.png",
+    "members/minitanutsuna/expressions/expression-05.png",
+    "members/minitanutsuna/expressions/expression-06.png",
+    "members/minitanutsuna/expressions/expression-07.png",
+    "members/minitanutsuna/expressions/expression-08.png",
+    "members/minitanutsuna/expressions/expression-09.png",
+    "members/minitanutsuna/expressions/expression-10.png"
+  ],
   "gyoza": [
     "members/gyoza/parts/arm-left.png",
     "members/gyoza/parts/arm-right.png",

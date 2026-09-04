@@ -3,6 +3,7 @@ const members = [
   { no: 3, name: "たぬつな", slug: "tanutsuna" }, { no: 4, name: "やんさん", slug: "yansan" },
   { no: 5, name: "ムート", slug: "muto" }, { no: 6, name: "もろん", slug: "moron" },
   { no: 7, name: "ウィーク", slug: "week" }, { no: 8, name: "ギョーザ", slug: "gyoza" },
+  { no: 9, name: "ミニたぬつな", slug: "minitanutsuna" },
 ];
 const $ = (id) => document.getElementById(id);
 const canvas = $("recordingCanvas"), ctx = canvas.getContext("2d", { alpha: false });
@@ -88,7 +89,11 @@ async function startRecording(){
     if($("micAudio").checked){micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});audioContext.createMediaStreamSource(micStream).connect(destination);}
     destinationTracks.push(...destination.stream.getAudioTracks());const combined=new MediaStream([...output.getVideoTracks(),...destinationTracks]);
     chunks=[];const mimeType=bestMime();recorder=new MediaRecorder(combined,{...(mimeType?{mimeType}:{}),videoBitsPerSecond:canvas.width>=3840?24000000:canvas.width>=2560?14000000:8000000});
-    recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recorder.onstop=saveRecording;recorder.start(1000);recordingStarted=Date.now();timer=setInterval(updateTime,250);setRecordingUi(true);note("収録中です。キャラクターは収録中も自由に移動・変形・回転できます。");
+    recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recorder.onstop=saveRecording;
+    // Electron/Chromium can emit timesliced WebM clusters without a reusable
+    // EBML header. We keep all data in memory anyway, so produce one finalized
+    // WebM segment on stop instead of concatenating one-second fragments.
+    recorder.start();recordingStarted=Date.now();timer=setInterval(updateTime,250);setRecordingUi(true);note("収録中です。キャラクターは収録中も自由に移動・変形・回転できます。");
   } catch(error){micStream?.getTracks().forEach(t=>t.stop());note(`録画を開始できません: ${error.message}`,true);}
 }
 function stopRecording(){if(recorder?.state!=="inactive")recorder.stop();clearInterval(timer);setRecordingUi(false);}
@@ -101,7 +106,9 @@ async function saveRecording(){
   if(format==="webm"){downloadWebm(blob);note(`WebM録画を保存しました（${(blob.size/1024/1024).toFixed(1)} MB）`);return;}
   try{
     $("recordState").textContent=`${format.toUpperCase()}へ変換中`;$("recordButton").disabled=true;note(`録画を${format.toUpperCase()}へ変換しています。長い4K録画では少し時間がかかります。`);
-    const response=await fetch(`/recording/export?format=${format}`,{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});const result=await response.json();if(!response.ok)throw new Error(result.error||"変換に失敗しました");
+    const bytes=await blob.arrayBuffer(),header=new Uint8Array(bytes,0,Math.min(4,bytes.byteLength));
+    if(bytes.byteLength<64||header[0]!==0x1a||header[1]!==0x45||header[2]!==0xdf||header[3]!==0xa3)throw new Error(`録画データを正常に確定できませんでした（${bytes.byteLength} bytes）。もう一度録画してください。`);
+    const response=await fetch(`/recording/export?format=${format}`,{method:"POST",headers:{"Content-Type":"application/octet-stream","X-Recording-Bytes":String(bytes.byteLength)},body:bytes});const result=await response.json();if(!response.ok)throw new Error(result.error||"変換に失敗しました");
     note(`${format.toUpperCase()}録画を保存しました：${result.path}（${(result.size/1024/1024).toFixed(1)} MB）`);
   }catch(error){downloadWebm(blob);note(`${format.toUpperCase()}変換に失敗したためWebMで保存しました：${error.message}`,true);}
   finally{$("recordState").textContent="収録準備";$("recordButton").disabled=false;}
